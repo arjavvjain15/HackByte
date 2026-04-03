@@ -106,6 +106,8 @@ curl -X GET "http://localhost:8000/api/reports/nearby?lat=12.34&lng=56.78&radius
   -H "Authorization: Bearer <SUPABASE_ACCESS_TOKEN>"
 ```
 
+Nearby reports now include `voted`, `distance_km`, and optional location fields.
+
 **Admin stats (curl)**
 ```
 curl -X GET "http://localhost:8000/api/admin/stats" ^
@@ -223,7 +225,8 @@ returns table (
   upvotes int,
   status text,
   created_at timestamp,
-  distance_m float
+  distance_m float,
+  distance_km text
 )
 language sql
 as $$
@@ -232,7 +235,17 @@ as $$
     6371000 * acos(
       cos(radians(lat)) * cos(radians(reports.lat)) * cos(radians(reports.lng) - radians(lng)) +
       sin(radians(lat)) * sin(radians(reports.lat))
-    ) as distance_m
+    ) as distance_m,
+    to_char(
+      round(
+        (6371000 * acos(
+          cos(radians(lat)) * cos(radians(reports.lat)) * cos(radians(reports.lng) - radians(lng)) +
+          sin(radians(lat)) * sin(radians(reports.lat))
+        )) / 1000.0,
+        1
+      ),
+      'FM999990.0'
+    ) || ' km' as distance_km
   from reports
   where 6371000 * acos(
       cos(radians(lat)) * cos(radians(reports.lat)) * cos(radians(reports.lng) - radians(lng)) +

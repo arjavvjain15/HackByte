@@ -62,9 +62,10 @@ def nearby_reports_endpoint(
     lat: float = Query(..., ge=-90, le=90),
     lng: float = Query(..., ge=-180, le=180),
     radius: int = Query(default=2000, ge=100, le=50000),
-    _user: Any = Depends(get_current_user),
+    user: Any = Depends(get_current_user),
 ):
-    reports = list_nearby_reports(lat, lng, radius)
+    user_id = get_current_user_id(user)
+    reports = list_nearby_reports(lat, lng, radius, user_id=user_id)
     return {"reports": reports}
 
 

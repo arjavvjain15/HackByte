@@ -21,7 +21,8 @@ returns table (
   upvotes int,
   status text,
   created_at timestamp,
-  distance_m float
+  distance_m float,
+  distance_km text
 )
 language sql
 as $$
@@ -37,7 +38,17 @@ as $$
     6371000 * acos(
       cos(radians(lat)) * cos(radians(r.lat)) * cos(radians(r.lng) - radians(lng)) +
       sin(radians(lat)) * sin(radians(r.lat))
-    ) as distance_m
+    ) as distance_m,
+    to_char(
+      round(
+        (6371000 * acos(
+          cos(radians(lat)) * cos(radians(r.lat)) * cos(radians(r.lng) - radians(lng)) +
+          sin(radians(lat)) * sin(radians(r.lat))
+        )) / 1000.0,
+        1
+      ),
+      'FM999990.0'
+    ) || ' km' as distance_km
   from public.reports r
   where 6371000 * acos(
       cos(radians(lat)) * cos(radians(r.lat)) * cos(radians(r.lng) - radians(lng)) +

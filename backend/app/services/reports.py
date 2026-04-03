@@ -244,7 +244,15 @@ def list_user_reports(user_id: str) -> list[dict]:
     return rows
 
 
-def list_nearby_reports(lat: float, lng: float, radius_m: int) -> list[dict]:
+def _format_distance_km(distance_m: float) -> str:
+    try:
+        km = float(distance_m) / 1000.0
+    except Exception:
+        km = 0.0
+    return f"{km:.1f} km"
+
+
+def list_nearby_reports(lat: float, lng: float, radius_m: int, user_id: str | None = None) -> list[dict]:
     client = get_supabase_client()
     # Prefer database-side distance filtering if the function exists.
     try:
@@ -253,13 +261,30 @@ def list_nearby_reports(lat: float, lng: float, radius_m: int) -> list[dict]:
             {"lat": lat, "lng": lng, "radius_m": radius_m},
         ).execute()
         if getattr(rpc_res, "data", None) is not None:
-            return rpc_res.data or []
+            rows = rpc_res.data or []
+            if user_id:
+                try:
+                    upvotes_res = (
+                        client.table("upvotes")
+                        .select("report_id")
+                        .eq("user_id", user_id)
+                        .execute()
+                    )
+                    voted_ids = {r.get("report_id") for r in (upvotes_res.data or [])}
+                except Exception:
+                    voted_ids = set()
+                for row in rows:
+                    row["voted"] = row.get("id") in voted_ids
+            for row in rows:
+                if "distance_m" in row and row.get("distance_m") is not None:
+                    row["distance_km"] = _format_distance_km(row["distance_m"])
+            return rows
     except Exception:
         # Fallback to Python filtering if RPC isn't available.
         pass
     try:
         result = client.table("reports").select(
-            "id,lat,lng,hazard_type,severity,upvotes,status,created_at"
+            "id,lat,lng,hazard_type,severity,upvotes,status,created_at,area,area_name,location,location_name,address"
         ).execute()
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Fetch failed: {exc}") from exc
@@ -288,7 +313,22 @@ def list_nearby_reports(lat: float, lng: float, radius_m: int) -> list[dict]:
         distance = haversine_m(lat, lng, rlat, rlng)
         if distance <= radius_m:
             report["distance_m"] = round(distance, 2)
+            report["distance_km"] = _format_distance_km(distance)
             nearby.append(report)
+
+    if user_id:
+        try:
+            upvotes_res = (
+                client.table("upvotes")
+                .select("report_id")
+                .eq("user_id", user_id)
+                .execute()
+            )
+            voted_ids = {r.get("report_id") for r in (upvotes_res.data or [])}
+        except Exception:
+            voted_ids = set()
+        for report in nearby:
+            report["voted"] = report.get("id") in voted_ids
 
     nearby.sort(key=lambda r: r.get("distance_m", 0))
     return nearby
