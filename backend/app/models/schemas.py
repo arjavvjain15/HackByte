@@ -1,5 +1,5 @@
-from typing import Optional
-from pydantic import BaseModel
+from typing import Optional, Literal
+from pydantic import BaseModel, Field, constr
 
 
 class PresignRequest(BaseModel):
@@ -15,16 +15,34 @@ class ClassifyRequest(BaseModel):
 
 
 class ReportCreateRequest(BaseModel):
-    photo_url: str
-    lat: float
-    lng: float
-    hazard_type: Optional[str] = None
-    severity: Optional[str] = None
-    department: Optional[str] = None
-    summary: Optional[str] = None
-    complaint_letter: Optional[str] = None
+    photo_url: constr(min_length=5, max_length=2048)
+    lat: float = Field(ge=-90, le=90)
+    lng: float = Field(ge=-180, le=180)
+    hazard_type: Optional[
+        Literal[
+            "illegal_dumping",
+            "oil_spill",
+            "e_waste",
+            "water_pollution",
+            "blocked_drain",
+            "air_pollution",
+            "other",
+        ]
+    ] = None
+    severity: Optional[Literal["high", "medium", "low"]] = None
+    department: Optional[
+        Literal[
+            "Municipal Sanitation",
+            "EPA",
+            "Public Works",
+            "Parks Department",
+            "Drainage Authority",
+        ]
+    ] = None
+    summary: Optional[constr(max_length=280)] = None
+    complaint_letter: Optional[constr(max_length=8000)] = None
 
 
 class AdminBulkUpdateRequest(BaseModel):
     ids: list[str]
-    status: str
+    status: Literal["open", "in_review", "resolved", "escalated"]

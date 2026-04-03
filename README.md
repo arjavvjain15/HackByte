@@ -13,6 +13,9 @@ Use `POST /api/classify` to call Cloud Vision + Gemini and get a structured haza
 Use `POST /api/reports` to save a full report to the database.  
 Admin-only: `GET /api/admin/reports` returns all reports.  
 Admin-only: `PATCH /api/admin/reports` bulk-updates report status.
+Public: `GET /api/reports` returns map pins.  
+User: `GET /api/reports/nearby` returns nearby hazards.  
+Admin-only: `GET /api/admin/stats` returns stat card numbers.
 
 **Required env vars**
 ```
@@ -75,4 +78,21 @@ curl -X PATCH "http://localhost:8000/api/admin/reports" ^
   -H "Authorization: Bearer <SUPABASE_ACCESS_TOKEN>" ^
   -H "Content-Type: application/json" ^
   -d "{\"ids\":[\"report-id-1\",\"report-id-2\"],\"status\":\"resolved\"}"
+```
+
+**Public map reports (curl)**
+```
+curl -X GET "http://localhost:8000/api/reports"
+```
+
+**Nearby reports (curl)**
+```
+curl -X GET "http://localhost:8000/api/reports/nearby?lat=12.34&lng=56.78&radius=2000" ^
+  -H "Authorization: Bearer <SUPABASE_ACCESS_TOKEN>"
+```
+
+**Admin stats (curl)**
+```
+curl -X GET "http://localhost:8000/api/admin/stats" ^
+  -H "Authorization: Bearer <SUPABASE_ACCESS_TOKEN>"
 ```
