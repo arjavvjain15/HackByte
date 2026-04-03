@@ -150,6 +150,27 @@ def bulk_update_reports(ids: list[str], status: str) -> dict:
     }
 
 
+def assign_department(ids: list[str], department: str) -> dict:
+    if not ids:
+        raise HTTPException(status_code=400, detail="No report ids provided")
+    client = get_supabase_client()
+    try:
+        reports_res = client.table("reports").select("id").in_("id", ids).execute()
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Fetch failed: {exc}") from exc
+
+    reports = reports_res.data or []
+    if not reports:
+        raise HTTPException(status_code=404, detail="No reports found for ids")
+
+    try:
+        client.table("reports").update({"department": department}).in_("id", ids).execute()
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Department update failed: {exc}") from exc
+
+    return {"updated_reports": len(reports), "department": department}
+
+
 def list_reports(
     severity: str | None = None,
     status: str | None = None,
@@ -526,3 +547,137 @@ def list_escalations(
     if sort == "highest_severity":
         data.sort(key=lambda r: SEVERITY_RANK.get(r.get("severity") or "", 0), reverse=True)
     return data
+
+
+def get_admin_breakdown(
+    date_from: str | None = None,
+    date_to: str | None = None,
+    severity: str | None = None,
+    status: str | None = None,
+) -> dict:
+    client = get_supabase_client()
+    try:
+        query = client.table("reports").select("hazard_type,area,area_name,location,location_name,address")
+        if date_from:
+            query = query.gte("created_at", date_from)
+        if date_to:
+            query = query.lte("created_at", date_to)
+        if severity:
+            query = query.eq("severity", severity)
+        if status:
+            query = query.eq("status", status)
+        result = query.execute()
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Breakdown fetch failed: {exc}") from exc
+
+    rows = result.data or []
+    by_type = Counter([r.get("hazard_type") or "other" for r in rows])
+    by_area = Counter(
+        [
+            (r.get("area") or r.get("area_name") or r.get("location_name") or r.get("location") or r.get("address") or "Unknown")
+            for r in rows
+        ]
+    )
+
+    return {
+        "by_type": [{"label": k, "count": v} for k, v in by_type.most_common()],
+        "by_area": [{"label": k, "count": v} for k, v in by_area.most_common()],
+    }
+
+
+def export_reports_csv(
+    severity: str | None = None,
+    status: str | None = None,
+    hazard_type: str | None = None,
+    area_name: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+    sort: str = "newest",
+    limit: int = 2000,
+) -> str:
+    rows = list_admin_reports(
+        severity=severity,
+        status=status,
+        hazard_type=hazard_type,
+        area_name=area_name,
+        date_from=date_from,
+        date_to=date_to,
+        sort=sort,
+        limit=limit,
+    )
+    headers = [
+        "id",
+        "created_at",
+        "hazard_type",
+        "severity",
+        "status",
+        "upvotes",
+        "department",
+        "lat",
+        "lng",
+    ]
+    lines = [",".join(headers)]
+    for r in rows:
+        line = [
+            str(r.get("id", "")),
+            str(r.get("created_at", "")),
+            str(r.get("hazard_type", "")),
+            str(r.get("severity", "")),
+            str(r.get("status", "")),
+            str(r.get("upvotes", "")),
+            str(r.get("department", "")),
+            str(r.get("lat", "")),
+            str(r.get("lng", "")),
+        ]
+        line = [v.replace(",", " ") if isinstance(v, str) else str(v) for v in line]
+        lines.append(",".join(line))
+    return "\n".join(lines)
+
+
+def get_admin_dashboard_bundle(
+    severity: str | None = None,
+    status: str | None = None,
+    hazard_type: str | None = None,
+    area_name: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+    sort: str = "newest",
+    limit: int = 500,
+    include_escalations: bool = False,
+) -> dict:
+    stats = admin_stats()
+    reports = list_admin_reports(
+        severity=severity,
+        status=status,
+        hazard_type=hazard_type,
+        area_name=area_name,
+        date_from=date_from,
+        date_to=date_to,
+        sort=sort,
+        limit=limit,
+    )
+    breakdown = get_admin_breakdown(
+        date_from=date_from,
+        date_to=date_to,
+        severity=severity,
+        status=status,
+    )
+    bundle = {
+        "stats": stats,
+        "reports": reports,
+        "breakdown": breakdown,
+    }
+    if include_escalations:
+        escalations = list_escalations(
+            severity=severity,
+            hazard_type=hazard_type,
+            area_name=area_name,
+            date_from=date_from,
+            date_to=date_to,
+            sort="most_upvoted",
+            limit=limit,
+            min_upvotes=5,
+        )
+        bundle["escalations"] = escalations
+        bundle["escalations_count"] = len(escalations)
+    return bundle

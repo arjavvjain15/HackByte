@@ -49,3 +49,8 @@ class ReportCreateRequest(BaseModel):
 class AdminBulkUpdateRequest(BaseModel):
     ids: list[str]
     status: ReportStatus
+
+
+class AdminAssignDepartmentRequest(BaseModel):
+    ids: list[str]
+    department: DepartmentType

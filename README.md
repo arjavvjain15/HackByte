@@ -14,6 +14,11 @@ Use `POST /api/reports` to save a full report to the database.
 Admin-only: `GET /api/admin/reports` returns all reports.  
 Admin-only: `PATCH /api/admin/reports` bulk-updates report status.  
 Admin-only: `GET /api/admin/escalations` returns dedicated escalated reports feed.  
+Admin-only: `PATCH /api/admin/reports/assign-department` assigns department to reports.  
+Admin-only: `GET /api/admin/breakdown` returns hazard breakdown by type and area.  
+Admin-only: `GET /api/admin/reports/export` returns CSV payload for filtered reports.
+Admin-only: `GET /api/admin/dashboard` returns stats + reports + breakdown in one call.
+Admin-only: `GET /api/admin/dashboard?include_escalations=true` also includes escalations + count.
 Public: `GET /api/reports` returns map pins.  
 Public: `GET /api/reports?area_name=...` filters map pins by area text.
 User: `GET /api/reports/nearby` returns nearby hazards.  
@@ -109,6 +114,38 @@ curl -X GET "http://localhost:8000/api/admin/stats" ^
 **Admin escalations (curl)**
 ```
 curl -X GET "http://localhost:8000/api/admin/escalations?area_name=Downtown&sort=most_upvoted" ^
+  -H "Authorization: Bearer <SUPABASE_ACCESS_TOKEN>"
+```
+
+**Admin assign department (curl)**
+```
+curl -X PATCH "http://localhost:8000/api/admin/reports/assign-department" ^
+  -H "Authorization: Bearer <SUPABASE_ACCESS_TOKEN>" ^
+  -H "Content-Type: application/json" ^
+  -d "{\"ids\":[\"report-id-1\"],\"department\":\"Municipal Sanitation\"}"
+```
+
+**Admin breakdown (curl)**
+```
+curl -X GET "http://localhost:8000/api/admin/breakdown?status=open" ^
+  -H "Authorization: Bearer <SUPABASE_ACCESS_TOKEN>"
+```
+
+**Admin export CSV (curl)**
+```
+curl -X GET "http://localhost:8000/api/admin/reports/export?severity=high" ^
+  -H "Authorization: Bearer <SUPABASE_ACCESS_TOKEN>"
+```
+
+**Admin dashboard bundle (curl)**
+```
+curl -X GET "http://localhost:8000/api/admin/dashboard?severity=high&sort=most_upvoted" ^
+  -H "Authorization: Bearer <SUPABASE_ACCESS_TOKEN>"
+```
+
+**Admin dashboard bundle with escalations (curl)**
+```
+curl -X GET "http://localhost:8000/api/admin/dashboard?include_escalations=true" ^
   -H "Authorization: Bearer <SUPABASE_ACCESS_TOKEN>"
 ```
 

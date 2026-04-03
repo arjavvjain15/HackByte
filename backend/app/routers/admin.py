@@ -4,13 +4,22 @@ from typing import Any
 from app.core.auth import get_current_user, require_admin
 from app.models.schemas import (
     AdminBulkUpdateRequest,
+    AdminAssignDepartmentRequest,
     HazardType,
     SeverityLevel,
     ReportStatus,
     AdminSortType,
 )
-from app.services.reports import list_admin_reports, bulk_update_reports, admin_stats
-from app.services.reports import list_escalations
+from app.services.reports import (
+    list_admin_reports,
+    bulk_update_reports,
+    admin_stats,
+    list_escalations,
+    assign_department,
+    get_admin_breakdown,
+    export_reports_csv,
+    get_admin_dashboard_bundle,
+)
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -83,3 +92,82 @@ def admin_escalations_endpoint(
         min_upvotes=min_upvotes,
     )
     return {"reports": escalations, "count": len(escalations)}
+
+
+@router.patch("/reports/assign-department")
+def admin_assign_department(
+    payload: AdminAssignDepartmentRequest,
+    user: Any = Depends(get_current_user),
+):
+    require_admin(user)
+    return assign_department(payload.ids, payload.department)
+
+
+@router.get("/breakdown")
+def admin_breakdown(
+    user: Any = Depends(get_current_user),
+    severity: SeverityLevel | None = Query(default=None),
+    status: ReportStatus | None = Query(default=None),
+    date_from: str | None = Query(default=None),
+    date_to: str | None = Query(default=None),
+):
+    require_admin(user)
+    return get_admin_breakdown(
+        date_from=date_from,
+        date_to=date_to,
+        severity=severity,
+        status=status,
+    )
+
+
+@router.get("/reports/export")
+def admin_export_reports(
+    user: Any = Depends(get_current_user),
+    severity: SeverityLevel | None = Query(default=None),
+    status: ReportStatus | None = Query(default=None),
+    hazard_type: HazardType | None = Query(default=None),
+    area_name: str | None = Query(default=None, min_length=2, max_length=120),
+    date_from: str | None = Query(default=None),
+    date_to: str | None = Query(default=None),
+    sort: AdminSortType = Query(default="newest"),
+    limit: int = Query(default=2000, ge=1, le=5000),
+):
+    require_admin(user)
+    csv_text = export_reports_csv(
+        severity=severity,
+        status=status,
+        hazard_type=hazard_type,
+        area_name=area_name,
+        date_from=date_from,
+        date_to=date_to,
+        sort=sort,
+        limit=limit,
+    )
+    return {"csv": csv_text}
+
+
+@router.get("/dashboard")
+def admin_dashboard_bundle(
+    user: Any = Depends(get_current_user),
+    severity: SeverityLevel | None = Query(default=None),
+    status: ReportStatus | None = Query(default=None),
+    hazard_type: HazardType | None = Query(default=None),
+    area_name: str | None = Query(default=None, min_length=2, max_length=120),
+    date_from: str | None = Query(default=None),
+    date_to: str | None = Query(default=None),
+    sort: AdminSortType = Query(default="newest"),
+    limit: int = Query(default=500, ge=1, le=1000),
+    include_escalations: bool = Query(default=False),
+):
+    require_admin(user)
+    return get_admin_dashboard_bundle(
+        severity=severity,
+        status=status,
+        hazard_type=hazard_type,
+        area_name=area_name,
+        date_from=date_from,
+        date_to=date_to,
+        sort=sort,
+        limit=limit,
+        include_escalations=include_escalations,
+    )
