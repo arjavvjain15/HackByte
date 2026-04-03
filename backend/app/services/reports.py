@@ -154,6 +154,7 @@ def list_reports(
     severity: str | None = None,
     status: str | None = None,
     hazard_type: str | None = None,
+    area_name: str | None = None,
     limit: int = 500,
 ) -> list[dict]:
     client = get_supabase_client()
@@ -171,7 +172,16 @@ def list_reports(
         result = query.order("created_at", desc=True).limit(limit).execute()
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Fetch failed: {exc}") from exc
-    return result.data or []
+    data = result.data or []
+    if area_name:
+        normalized = area_name.strip().lower()
+        area_keys = ["area", "area_name", "location_name", "location", "address"]
+        data = [
+            row
+            for row in data
+            if any(normalized in str(row.get(key, "")).lower() for key in area_keys)
+        ]
+    return data
 
 
 def list_user_reports(user_id: str) -> list[dict]:
@@ -186,7 +196,22 @@ def list_user_reports(user_id: str) -> list[dict]:
         )
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Fetch failed: {exc}") from exc
-    return result.data or []
+    rows = result.data or []
+    for row in rows:
+        status = row.get("status") or "open"
+        if status == "resolved":
+            row["progress_percent"] = 100
+            row["status_label"] = "Resolved"
+        elif status == "in_review":
+            row["progress_percent"] = 66
+            row["status_label"] = "In review"
+        elif status == "escalated":
+            row["progress_percent"] = 80
+            row["status_label"] = "Escalated"
+        else:
+            row["progress_percent"] = 33
+            row["status_label"] = "Open"
+    return rows
 
 
 def list_nearby_reports(lat: float, lng: float, radius_m: int) -> list[dict]:
@@ -242,6 +267,20 @@ def list_nearby_reports(lat: float, lng: float, radius_m: int) -> list[dict]:
 def upvote_report(report_id: str, user_id: str) -> dict:
     client = get_supabase_client()
     try:
+        report_res = (
+            client.table("reports")
+            .select("id,upvotes,status")
+            .eq("id", report_id)
+            .single()
+            .execute()
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=404, detail=f"Report not found: {exc}") from exc
+
+    if not isinstance(report_res.data, dict):
+        raise HTTPException(status_code=404, detail="Report not found")
+
+    try:
         insert_res = client.table("upvotes").insert(
             {"report_id": report_id, "user_id": user_id}
         ).execute()
@@ -254,22 +293,8 @@ def upvote_report(report_id: str, user_id: str) -> dict:
     if not getattr(insert_res, "data", None):
         raise HTTPException(status_code=500, detail="Upvote failed: no data returned")
 
-    try:
-        report_res = (
-            client.table("reports")
-            .select("upvotes,status")
-            .eq("id", report_id)
-            .single()
-            .execute()
-        )
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Report fetch failed: {exc}") from exc
-
-    current_upvotes = 0
-    current_status = None
-    if isinstance(report_res.data, dict):
-        current_upvotes = int(report_res.data.get("upvotes") or 0)
-        current_status = report_res.data.get("status")
+    current_upvotes = int(report_res.data.get("upvotes") or 0)
+    current_status = report_res.data.get("status")
 
     new_upvotes = current_upvotes + 1
     update_payload = {"upvotes": new_upvotes}
@@ -415,6 +440,89 @@ def build_share_payload(report: dict) -> dict:
     return {
         "title": "EcoSnap Report",
         "text": text,
+        "copy_text": text,
         "mailto_url": f"mailto:?subject={mailto_subject}&body={mailto_body}",
         "whatsapp_url": f"https://wa.me/?text={whatsapp_text}",
     }
+
+
+def share_payload_for_channel(report: dict, channel: str) -> dict:
+    payload = build_share_payload(report)
+    if channel == "email":
+        return {
+            "channel": channel,
+            "title": payload["title"],
+            "text": payload["text"],
+            "target_url": payload["mailto_url"],
+        }
+    if channel == "whatsapp":
+        return {
+            "channel": channel,
+            "title": payload["title"],
+            "text": payload["text"],
+            "target_url": payload["whatsapp_url"],
+        }
+    if channel == "copy":
+        return {
+            "channel": channel,
+            "title": payload["title"],
+            "text": payload["copy_text"],
+            "target_url": None,
+        }
+    return {
+        "channel": "native",
+        "title": payload["title"],
+        "text": payload["text"],
+        "target_url": None,
+    }
+
+
+def list_escalations(
+    severity: str | None = None,
+    hazard_type: str | None = None,
+    area_name: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+    sort: str = "most_upvoted",
+    limit: int = 500,
+    min_upvotes: int = 5,
+) -> list[dict]:
+    client = get_supabase_client()
+    try:
+        query = client.table("reports").select("*")
+        if severity:
+            query = query.eq("severity", severity)
+        if hazard_type:
+            query = query.eq("hazard_type", hazard_type)
+        if date_from:
+            query = query.gte("created_at", date_from)
+        if date_to:
+            query = query.lte("created_at", date_to)
+        query = query.gte("upvotes", min_upvotes)
+
+        if sort == "newest":
+            query = query.order("created_at", desc=True)
+        elif sort == "oldest":
+            query = query.order("created_at", desc=False)
+        elif sort == "highest_severity":
+            query = query.order("created_at", desc=True)
+        else:
+            query = query.order("upvotes", desc=True)
+
+        result = query.limit(limit).execute()
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Escalations fetch failed: {exc}") from exc
+
+    data = result.data or []
+    data = [row for row in data if row.get("status") == "escalated" or int(row.get("upvotes") or 0) >= min_upvotes]
+    if area_name:
+        normalized = area_name.strip().lower()
+        area_keys = ["area", "area_name", "location_name", "location", "address"]
+        data = [
+            row
+            for row in data
+            if any(normalized in str(row.get(key, "")).lower() for key in area_keys)
+        ]
+    if sort == "highest_severity":
+        data.sort(key=lambda r: SEVERITY_RANK.get(r.get("severity") or "", 0), reverse=True)
+    return data

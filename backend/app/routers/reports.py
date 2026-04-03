@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Query, HTTPException
 from typing import Any
 
 from app.core.auth import get_current_user, get_current_user_id
-from app.models.schemas import ReportCreateRequest, HazardType, SeverityLevel, ReportStatus
+from app.models.schemas import ReportCreateRequest, HazardType, SeverityLevel, ReportStatus, ShareChannel
 from app.services.reports import (
     create_report,
     list_reports,
@@ -12,6 +12,7 @@ from app.services.reports import (
     get_upvote_status,
     get_complaint_letter,
     build_share_payload,
+    share_payload_for_channel,
 )
 
 router = APIRouter(prefix="/api", tags=["reports"])
@@ -43,9 +44,16 @@ def list_reports_endpoint(
     severity: SeverityLevel | None = Query(default=None),
     status: ReportStatus | None = Query(default=None),
     hazard_type: HazardType | None = Query(default=None),
+    area_name: str | None = Query(default=None, min_length=2, max_length=120),
     limit: int = Query(default=500, ge=1, le=1000),
 ):
-    reports = list_reports(severity=severity, status=status, hazard_type=hazard_type, limit=limit)
+    reports = list_reports(
+        severity=severity,
+        status=status,
+        hazard_type=hazard_type,
+        area_name=area_name,
+        limit=limit,
+    )
     return {"reports": reports}
 
 
@@ -110,8 +118,12 @@ def complaint_letter_endpoint(
 @router.get("/reports/{report_id}/share-payload")
 def share_payload_endpoint(
     report_id: str,
+    channel: ShareChannel = Query(default="native"),
     user: Any = Depends(get_current_user),
 ):
     user_id = get_current_user_id(user)
     report = get_complaint_letter(report_id, user_id)
-    return build_share_payload(report)
+    payload = build_share_payload(report)
+    payload["channel_payload"] = share_payload_for_channel(report, channel)
+    payload["channel"] = channel
+    return payload

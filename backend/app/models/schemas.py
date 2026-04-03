@@ -20,6 +20,7 @@ DepartmentType: TypeAlias = Literal[
     "Drainage Authority",
 ]
 AdminSortType: TypeAlias = Literal["newest", "oldest", "most_upvoted", "highest_severity"]
+ShareChannel: TypeAlias = Literal["native", "email", "whatsapp", "copy"]
 
 
 class PresignRequest(BaseModel):

@@ -13,13 +13,18 @@ Use `POST /api/classify` to call Cloud Vision + Gemini and get a structured haza
 Use `POST /api/reports` to save a full report to the database.  
 Admin-only: `GET /api/admin/reports` returns all reports.  
 Admin-only: `PATCH /api/admin/reports` bulk-updates report status.  
+Admin-only: `GET /api/admin/escalations` returns dedicated escalated reports feed.  
 Public: `GET /api/reports` returns map pins.  
+Public: `GET /api/reports?area_name=...` filters map pins by area text.
 User: `GET /api/reports/nearby` returns nearby hazards.  
 Admin-only: `GET /api/admin/stats` returns stat card numbers.
 User: `POST /api/reports/:id/upvote` upvotes a report (Feature 6).
 User: `GET /api/reports/:id/upvote-status` checks if current user already voted.
 User: `GET /api/reports/:id/complaint-letter` gets stored complaint letter (Feature 7 helper).
 User: `GET /api/reports/:id/share-payload` gets share-ready payload/URLs (Feature 7 helper).
+User: `GET /api/me/profile` returns role + profile counters for dashboard boot.
+User: `GET /api/me/activity` returns recent dashboard notifications.
+User: `GET /api/me/dashboard` returns profile + stats + reports + activity bundle.
 
 **Required env vars**
 ```
@@ -86,7 +91,7 @@ curl -X PATCH "http://localhost:8000/api/admin/reports" ^
 
 **Public map reports (curl)**
 ```
-curl -X GET "http://localhost:8000/api/reports"
+curl -X GET "http://localhost:8000/api/reports?severity=high&area_name=Downtown"
 ```
 
 **Nearby reports (curl)**
@@ -98,6 +103,12 @@ curl -X GET "http://localhost:8000/api/reports/nearby?lat=12.34&lng=56.78&radius
 **Admin stats (curl)**
 ```
 curl -X GET "http://localhost:8000/api/admin/stats" ^
+  -H "Authorization: Bearer <SUPABASE_ACCESS_TOKEN>"
+```
+
+**Admin escalations (curl)**
+```
+curl -X GET "http://localhost:8000/api/admin/escalations?area_name=Downtown&sort=most_upvoted" ^
   -H "Authorization: Bearer <SUPABASE_ACCESS_TOKEN>"
 ```
 
@@ -127,7 +138,25 @@ curl -X GET "http://localhost:8000/api/reports/<report-id>/complaint-letter" ^
 
 **Share payload helper (curl)**
 ```
-curl -X GET "http://localhost:8000/api/reports/<report-id>/share-payload" ^
+curl -X GET "http://localhost:8000/api/reports/<report-id>/share-payload?channel=whatsapp" ^
+  -H "Authorization: Bearer <SUPABASE_ACCESS_TOKEN>"
+```
+
+**My profile (curl)**
+```
+curl -X GET "http://localhost:8000/api/me/profile" ^
+  -H "Authorization: Bearer <SUPABASE_ACCESS_TOKEN>"
+```
+
+**My activity (curl)**
+```
+curl -X GET "http://localhost:8000/api/me/activity" ^
+  -H "Authorization: Bearer <SUPABASE_ACCESS_TOKEN>"
+```
+
+**My dashboard bundle (curl)**
+```
+curl -X GET "http://localhost:8000/api/me/dashboard" ^
   -H "Authorization: Bearer <SUPABASE_ACCESS_TOKEN>"
 ```
 
@@ -135,6 +164,7 @@ Query params now use strict enum validation:
 `severity`: `high|medium|low`
 `status`: `open|in_review|resolved|escalated`
 `sort`: `newest|oldest|most_upvoted|highest_severity`
+`channel`: `native|email|whatsapp|copy`
 
 **Nearby RPC (optional)**
 If you want Postgres to filter by distance, create this function once in Supabase SQL:
