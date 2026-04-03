@@ -2,11 +2,13 @@ from datetime import datetime, timezone
 from collections import Counter
 from fastapi import HTTPException
 import math
+from urllib.parse import quote
 
 from app.core.supabase import get_supabase_client
 
 
 ALLOWED_STATUSES = {"open", "in_review", "resolved", "escalated"}
+SEVERITY_RANK = {"high": 3, "medium": 2, "low": 1}
 
 
 def create_report(user_id: str, payload: dict) -> dict:
@@ -40,13 +42,54 @@ def create_report(user_id: str, payload: dict) -> dict:
     return report_data
 
 
-def list_admin_reports() -> list[dict]:
+def list_admin_reports(
+    severity: str | None = None,
+    status: str | None = None,
+    hazard_type: str | None = None,
+    area_name: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+    sort: str = "newest",
+    limit: int = 500,
+) -> list[dict]:
     client = get_supabase_client()
     try:
-        result = client.table("reports").select("*").order("created_at", desc=True).execute()
+        query = client.table("reports").select("*")
+        if severity:
+            query = query.eq("severity", severity)
+        if status:
+            query = query.eq("status", status)
+        if hazard_type:
+            query = query.eq("hazard_type", hazard_type)
+        if date_from:
+            query = query.gte("created_at", date_from)
+        if date_to:
+            query = query.lte("created_at", date_to)
+
+        if sort == "most_upvoted":
+            query = query.order("upvotes", desc=True)
+        elif sort == "newest":
+            query = query.order("created_at", desc=True)
+        elif sort == "oldest":
+            query = query.order("created_at", desc=False)
+        else:
+            query = query.order("created_at", desc=True)
+
+        result = query.limit(limit).execute()
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Fetch failed: {exc}") from exc
-    return result.data or []
+    data = result.data or []
+    if area_name:
+        normalized = area_name.strip().lower()
+        area_keys = ["area", "area_name", "location_name", "location", "address"]
+        data = [
+            row
+            for row in data
+            if any(normalized in str(row.get(key, "")).lower() for key in area_keys)
+        ]
+    if sort == "highest_severity":
+        data.sort(key=lambda r: SEVERITY_RANK.get(r.get("severity") or "", 0), reverse=True)
+    return data
 
 
 def bulk_update_reports(ids: list[str], status: str) -> dict:
@@ -148,12 +191,21 @@ def list_user_reports(user_id: str) -> list[dict]:
 
 def list_nearby_reports(lat: float, lng: float, radius_m: int) -> list[dict]:
     client = get_supabase_client()
+    # Prefer database-side distance filtering if the function exists.
     try:
-        result = (
-            client.table("reports")
-            .select("id,lat,lng,hazard_type,severity,upvotes,status,created_at")
-            .execute()
-        )
+        rpc_res = client.rpc(
+            "nearby_reports",
+            {"lat": lat, "lng": lng, "radius_m": radius_m},
+        ).execute()
+        if getattr(rpc_res, "data", None) is not None:
+            return rpc_res.data or []
+    except Exception:
+        # Fallback to Python filtering if RPC isn't available.
+        pass
+    try:
+        result = client.table("reports").select(
+            "id,lat,lng,hazard_type,severity,upvotes,status,created_at"
+        ).execute()
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Fetch failed: {exc}") from exc
 
@@ -187,6 +239,84 @@ def list_nearby_reports(lat: float, lng: float, radius_m: int) -> list[dict]:
     return nearby
 
 
+def upvote_report(report_id: str, user_id: str) -> dict:
+    client = get_supabase_client()
+    try:
+        insert_res = client.table("upvotes").insert(
+            {"report_id": report_id, "user_id": user_id}
+        ).execute()
+    except Exception as exc:
+        message = str(exc).lower()
+        if "duplicate" in message or "23505" in message:
+            raise HTTPException(status_code=409, detail="User already upvoted") from exc
+        raise HTTPException(status_code=500, detail=f"Upvote failed: {exc}") from exc
+
+    if not getattr(insert_res, "data", None):
+        raise HTTPException(status_code=500, detail="Upvote failed: no data returned")
+
+    try:
+        report_res = (
+            client.table("reports")
+            .select("upvotes,status")
+            .eq("id", report_id)
+            .single()
+            .execute()
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Report fetch failed: {exc}") from exc
+
+    current_upvotes = 0
+    current_status = None
+    if isinstance(report_res.data, dict):
+        current_upvotes = int(report_res.data.get("upvotes") or 0)
+        current_status = report_res.data.get("status")
+
+    new_upvotes = current_upvotes + 1
+    update_payload = {"upvotes": new_upvotes}
+    if new_upvotes >= 5 and current_status != "escalated":
+        update_payload["status"] = "escalated"
+
+    try:
+        client.table("reports").update(update_payload).eq("id", report_id).execute()
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Report update failed: {exc}") from exc
+
+    return {
+        "report_id": report_id,
+        "upvotes": new_upvotes,
+        "status": update_payload.get("status", current_status or "open"),
+    }
+
+
+def get_upvote_status(report_id: str, user_id: str) -> dict:
+    client = get_supabase_client()
+    try:
+        upvote_res = (
+            client.table("upvotes")
+            .select("id")
+            .eq("report_id", report_id)
+            .eq("user_id", user_id)
+            .limit(1)
+            .execute()
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Upvote status failed: {exc}") from exc
+
+    try:
+        report_res = client.table("reports").select("upvotes,status").eq("id", report_id).single().execute()
+    except Exception as exc:
+        raise HTTPException(status_code=404, detail=f"Report not found: {exc}") from exc
+
+    voted = bool(upvote_res.data)
+    upvotes = 0
+    status = "open"
+    if isinstance(report_res.data, dict):
+        upvotes = int(report_res.data.get("upvotes") or 0)
+        status = report_res.data.get("status") or "open"
+
+    return {"report_id": report_id, "voted": voted, "upvotes": upvotes, "status": status}
+
+
 def admin_stats() -> dict:
     client = get_supabase_client()
     try:
@@ -218,4 +348,73 @@ def admin_stats() -> dict:
         "resolved": counts.get("resolved", 0),
         "escalated": escalated,
         "avg_resolution_hours": avg_resolution_hours,
+    }
+
+
+def _is_admin_user(user_id: str) -> bool:
+    client = get_supabase_client()
+    try:
+        profile = client.table("profiles").select("is_admin").eq("id", user_id).single().execute()
+    except Exception:
+        return False
+    if isinstance(profile.data, dict):
+        return bool(profile.data.get("is_admin"))
+    return False
+
+
+def get_complaint_letter(report_id: str, requester_user_id: str) -> dict:
+    client = get_supabase_client()
+    try:
+        report_res = (
+            client.table("reports")
+            .select("id,user_id,hazard_type,department,complaint,created_at,lat,lng,photo_url")
+            .eq("id", report_id)
+            .single()
+            .execute()
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=404, detail=f"Report not found: {exc}") from exc
+
+    report = report_res.data if isinstance(report_res.data, dict) else None
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
+
+    is_owner = report.get("user_id") == requester_user_id
+    if not is_owner and not _is_admin_user(requester_user_id):
+        raise HTTPException(status_code=403, detail="Access denied for complaint letter")
+
+    complaint = report.get("complaint")
+    if not complaint:
+        raise HTTPException(status_code=404, detail="Complaint letter not available")
+    return report
+
+
+def build_share_payload(report: dict) -> dict:
+    report_id = report.get("id")
+    department = report.get("department") or "Concerned Department"
+    hazard_type = report.get("hazard_type") or "environmental_hazard"
+    lat = report.get("lat")
+    lng = report.get("lng")
+    photo_url = report.get("photo_url") or ""
+    complaint = report.get("complaint") or ""
+    created_at = report.get("created_at") or datetime.now(timezone.utc).isoformat()
+
+    subject = f"EcoSnap Report {report_id} - {hazard_type}"
+    text = (
+        f"To: {department}\n"
+        f"Date: {created_at}\n"
+        f"Subject: {hazard_type}\n\n"
+        f"{complaint}\n\n"
+        f"Photo evidence: {photo_url}\n"
+        f"GPS coordinates: {lat}, {lng}\n"
+        f"Report ID: {report_id}"
+    )
+    whatsapp_text = quote(text, safe="")
+    mailto_subject = quote(subject, safe="")
+    mailto_body = quote(text, safe="")
+    return {
+        "title": "EcoSnap Report",
+        "text": text,
+        "mailto_url": f"mailto:?subject={mailto_subject}&body={mailto_body}",
+        "whatsapp_url": f"https://wa.me/?text={whatsapp_text}",
     }
