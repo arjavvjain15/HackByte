@@ -41,6 +41,19 @@ class _ReportsQuery(_NoopQuery):
         return _Result(self.rows)
 
 
+class _CaptureQuery(_NoopQuery):
+    def __init__(self, rows):
+        self.rows = rows
+        self.filters = []
+
+    def eq(self, field, value):
+        self.filters.append((field, value))
+        return self
+
+    def execute(self):
+        return _Result(self.rows)
+
+
 def test_upvote_conflict_returns_409(monkeypatch):
     class _UpvotesConflictQuery(_NoopQuery):
         def insert(self, _payload):
@@ -133,3 +146,19 @@ def test_admin_area_filter_is_case_insensitive(monkeypatch):
 
     assert len(result) == 1
     assert result[0]["id"] == "r1"
+
+
+def test_list_reports_supports_user_id_filter(monkeypatch):
+    query = _CaptureQuery([{"id": "r1", "user_id": "u1"}])
+
+    class _Client:
+        def table(self, name):
+            if name == "reports":
+                return query
+            return _NoopQuery()
+
+    monkeypatch.setattr(reports_service, "get_supabase_client", lambda: _Client())
+    result = reports_service.list_reports(user_id="u1")
+
+    assert result == [{"id": "r1", "user_id": "u1"}]
+    assert ("user_id", "u1") in query.filters

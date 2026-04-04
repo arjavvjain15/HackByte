@@ -1,0 +1,15 @@
+.env
+EcoSnap_FULL_README.md
+ECOSNAP_PLAN.md
+.venv
+venv
+__pycache__
+*.pyc
+*.pyo
+backend/venv/
+backend/__pycache__/
+backend/app/__pycache__/
+test_*.py
+test_*.json
+test_*.txt
+*.log

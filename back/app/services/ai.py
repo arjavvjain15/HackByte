@@ -1,10 +1,18 @@
 import asyncio
 import json
+from pathlib import Path
+import sys
 from typing import Optional
 from fastapi import HTTPException
 import httpx
 
-from app.core.config import get_env
+from app.core.config import get_env_alias
+
+ROOT_DIR = Path(__file__).resolve().parents[3]
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
+from ai.pipeline import normalize_classification_result
 
 
 def _extract_json(text: str) -> dict:
@@ -48,7 +56,7 @@ async def _request_with_retry(
 
 
 async def call_cloud_vision(photo_url: str) -> list[dict]:
-    api_key = get_env("GOOGLE_CLOUD_VISION_API_KEY")
+    api_key = get_env_alias(["GOOGLE_CLOUD_VISION_API_KEY", "CLOUD_VISION_API_KEY", "Cloud_Vision"])
     endpoint = f"https://vision.googleapis.com/v1/images:annotate?key={api_key}"
     payload = {
         "requests": [
@@ -74,7 +82,7 @@ async def call_cloud_vision(photo_url: str) -> list[dict]:
 
 
 async def call_gemini(prompt: str) -> dict:
-    api_key = get_env("GEMINI_API_KEY")
+    api_key = get_env_alias(["GEMINI_API_KEY", "Gemini"])
     endpoint = (
         "https://generativelanguage.googleapis.com/"
         f"v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
@@ -109,3 +117,9 @@ async def call_gemini(prompt: str) -> dict:
             status_code=502,
             detail=f"Gemini output was not valid JSON: {exc}",
         ) from exc
+
+def ensure_classification_result(payload: dict):
+    try:
+        return normalize_classification_result(payload)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Classification schema validation failed: {exc}") from exc

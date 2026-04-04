@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Query, HTTPException
 from typing import Any
 
-from app.core.auth import get_current_user, get_current_user_id
+from app.core.auth import get_current_user, get_current_user_id, get_optional_current_user
 from app.models.schemas import ReportCreateRequest, HazardType, SeverityLevel, ReportStatus, ShareChannel
 from app.services.reports import (
     create_report,
@@ -34,6 +34,8 @@ def create_report_endpoint(
         "department": payload.department,
         "summary": payload.summary,
         "complaint": payload.complaint_letter,
+        "resources": payload.resources.model_dump() if payload.resources else None,
+        "confidence": payload.confidence,
     }
     report = create_report(user_id, report_payload)
     return {"report": report}
@@ -44,14 +46,25 @@ def list_reports_endpoint(
     severity: SeverityLevel | None = Query(default=None),
     status: ReportStatus | None = Query(default=None),
     hazard_type: HazardType | None = Query(default=None),
+    area: str | None = Query(default=None, min_length=2, max_length=120),
     area_name: str | None = Query(default=None, min_length=2, max_length=120),
+    user_id: str | None = Query(default=None),
     limit: int = Query(default=500, ge=1, le=1000),
+    user: Any | None = Depends(get_optional_current_user),
 ):
+    area_filter = area_name or area
+    if user_id == "me":
+        if not user:
+            raise HTTPException(status_code=401, detail="Authentication required for user_id=me")
+        current_user_id = get_current_user_id(user)
+        return {"reports": list_user_reports(current_user_id)}
+
     reports = list_reports(
         severity=severity,
         status=status,
         hazard_type=hazard_type,
-        area_name=area_name,
+        area_name=area_filter,
+        user_id=user_id if user_id and user_id != "me" else None,
         limit=limit,
     )
     return {"reports": reports}

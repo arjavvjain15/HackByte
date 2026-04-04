@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "EcoSnapClassificationResult",
+  "type": "object",
+  "required": [
+    "hazard_type",
+    "severity",
+    "department",
+    "summary",
+    "complaint_letter",
+    "resources"
+  ],
+  "properties": {
+    "hazard_type": {
+      "type": "string",
+      "enum": [
+        "illegal_dumping",
+        "oil_spill",
+        "e_waste",
+        "water_pollution",
+        "blocked_drain",
+        "air_pollution",
+        "other"
+      ]
+    },
+    "severity": {
+      "type": "string",
+      "enum": ["high", "medium", "low"]
+    },
+    "department": {
+      "type": "string",
+      "enum": [
+        "Municipal Sanitation",
+        "EPA",
+        "Public Works",
+        "Parks Department",
+        "Drainage Authority"
+      ]
+    },
+    "summary": {
+      "type": "string"
+    },
+    "complaint_letter": {
+      "type": "string"
+    },
+    "confidence": {
+      "type": "string",
+      "enum": ["high", "low"]
+    },
+    "resources": {
+      "type": "object",
+      "required": ["workers", "vehicles", "estimated_time", "priority"],
+      "properties": {
+        "workers": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "vehicles": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "estimated_time": {
+          "type": "string"
+        },
+        "priority": {
+          "type": "string",
+          "enum": ["high", "medium", "low"]
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

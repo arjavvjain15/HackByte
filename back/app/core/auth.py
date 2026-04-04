@@ -28,6 +28,12 @@ def get_current_user(authorization: Optional[str] = Header(None)) -> Any:
     return user
 
 
+def get_optional_current_user(authorization: Optional[str] = Header(None)) -> Any | None:
+    if not authorization:
+        return None
+    return get_current_user(authorization)
+
+
 def get_current_user_id(user: Any) -> str:
     user_id = getattr(user, "id", None)
     if not user_id and isinstance(user, dict):

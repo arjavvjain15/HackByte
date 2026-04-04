@@ -1,16 +1,18 @@
 # EcoSnap (HackByte4.0)
 
-Backend scaffold for the EcoSnap hackathon project.
+Backend source of truth is now `back/`.
+The `ai/` folder stores the AI prompt assets and classification schema contract used by the backend classify pipeline.
 
 **Photo Upload (Feature 2)**  
 Use `POST /api/upload` to upload a camera photo to Supabase Storage and receive a public URL.  
 Use `POST /api/uploads/presign` to get a signed upload URL for direct-to-storage uploads.
 
 **AI Classification (Feature 3)**  
-Use `POST /api/classify` to call Cloud Vision + Gemini and get a structured hazard result.
+Use `POST /api/classify` to call Cloud Vision + Gemini and get a structured hazard result, including a `resources` block for authority planning.
 
 **Report Submission (Feature 4)**  
 Use `POST /api/reports` to save a full report to the database.  
+`POST /api/reports` also accepts optional `resources` and `confidence` from the AI classification result.  
 Admin-only: `GET /api/admin/reports` returns all reports.  
 Admin-only: `PATCH /api/admin/reports` bulk-updates report status.  
 Admin-only: `GET /api/admin/escalations` returns dedicated escalated reports feed.  
@@ -20,6 +22,9 @@ Admin-only: `GET /api/admin/reports/export` returns CSV payload for filtered rep
 Admin-only: `GET /api/admin/dashboard` returns stats + reports + breakdown in one call.
 Admin-only: `GET /api/admin/dashboard?include_escalations=true` also includes escalations + count.
 Public: `GET /api/reports` returns map pins.  
+Public: `GET /api/reports?user_id=<uuid>` filters pins by reporter id.  
+User: `GET /api/reports?user_id=me` returns the current user's reports for the dashboard flow.  
+Public: `GET /api/reports?area=...` is supported as an alias for `area_name`.  
 Public: `GET /api/reports?area_name=...` filters map pins by area text.
 User: `GET /api/reports/nearby` returns nearby hazards.  
 Admin-only: `GET /api/admin/stats` returns stat card numbers.
@@ -43,7 +48,7 @@ GEMINI_API_KEY=
 
 **Run locally**
 ```
-cd backend
+cd back
 python -m venv .venv
 .venv\Scripts\activate
 pip install -r requirements.txt
@@ -73,12 +78,15 @@ curl -X POST "http://localhost:8000/api/classify" ^
   -d "{\"photo_url\":\"https://...\",\"lat\":12.34,\"lng\":56.78,\"reporter_name\":\"Alex\"}"
 ```
 
+Classification response includes:
+`hazard_type`, `severity`, `department`, `summary`, `complaint_letter`, `resources`, and optional `confidence`.
+
 **Create report example (curl)**
 ```
 curl -X POST "http://localhost:8000/api/reports" ^
   -H "Authorization: Bearer <SUPABASE_ACCESS_TOKEN>" ^
   -H "Content-Type: application/json" ^
-  -d "{\"photo_url\":\"https://...\",\"lat\":12.34,\"lng\":56.78,\"hazard_type\":\"illegal_dumping\",\"severity\":\"high\",\"department\":\"Municipal Sanitation\",\"summary\":\"Trash pile by the curb\",\"complaint_letter\":\"...\"}"
+  -d "{\"photo_url\":\"https://...\",\"lat\":12.34,\"lng\":56.78,\"hazard_type\":\"illegal_dumping\",\"severity\":\"high\",\"department\":\"Municipal Sanitation\",\"summary\":\"Trash pile by the curb\",\"complaint_letter\":\"...\",\"confidence\":\"high\",\"resources\":{\"workers\":4,\"vehicles\":[\"garbage truck\"],\"estimated_time\":\"4-8 hours\",\"priority\":\"high\"}}"
 ```
 
 **Admin list reports example (curl)**
@@ -98,6 +106,12 @@ curl -X PATCH "http://localhost:8000/api/admin/reports" ^
 **Public map reports (curl)**
 ```
 curl -X GET "http://localhost:8000/api/reports?severity=high&area_name=Downtown"
+```
+
+**Current user reports via query param (curl)**
+```
+curl -X GET "http://localhost:8000/api/reports?user_id=me" ^
+  -H "Authorization: Bearer <SUPABASE_ACCESS_TOKEN>"
 ```
 
 **Nearby reports (curl)**
@@ -256,4 +270,7 @@ $$;
 ```
 
 You can run the full SQL helper script from:
-`backend/sql/feature6_feature5_helpers.sql`
+`back/sql/feature6_feature5_helpers.sql`
+
+For a complete backend bootstrap, including `profiles`, the auth trigger, `reports`, `upvotes`, `user_badges`, and the nearby RPC, use:
+`back/sql/full_backend_schema.sql`

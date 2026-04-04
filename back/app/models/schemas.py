@@ -1,5 +1,13 @@
+from pathlib import Path
+import sys
 from typing import Optional, Literal, TypeAlias
 from pydantic import BaseModel, Field, constr
+
+ROOT_DIR = Path(__file__).resolve().parents[3]
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
+from ai.contracts import ClassificationResources, ClassificationResult, ConfidenceLevel
 
 HazardType: TypeAlias = Literal[
     "illegal_dumping",
@@ -21,6 +29,7 @@ DepartmentType: TypeAlias = Literal[
 ]
 AdminSortType: TypeAlias = Literal["newest", "oldest", "most_upvoted", "highest_severity"]
 ShareChannel: TypeAlias = Literal["native", "email", "whatsapp", "copy"]
+PriorityLevel: TypeAlias = Literal["high", "medium", "low"]
 
 
 class PresignRequest(BaseModel):
@@ -44,6 +53,8 @@ class ReportCreateRequest(BaseModel):
     department: Optional[DepartmentType] = None
     summary: Optional[constr(max_length=280)] = None
     complaint_letter: Optional[constr(max_length=8000)] = None
+    resources: Optional[ClassificationResources] = None
+    confidence: Optional[ConfidenceLevel] = None
 
 
 class AdminBulkUpdateRequest(BaseModel):

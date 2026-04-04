@@ -30,6 +30,7 @@ def admin_list_reports(
     severity: SeverityLevel | None = Query(default=None),
     status: ReportStatus | None = Query(default=None),
     hazard_type: HazardType | None = Query(default=None),
+    area: str | None = Query(default=None, min_length=2, max_length=120),
     area_name: str | None = Query(default=None, min_length=2, max_length=120),
     date_from: str | None = Query(default=None),
     date_to: str | None = Query(default=None),
@@ -37,11 +38,12 @@ def admin_list_reports(
     limit: int = Query(default=500, ge=1, le=1000),
 ):
     require_admin(user)
+    area_filter = area_name or area
     reports = list_admin_reports(
         severity=severity,
         status=status,
         hazard_type=hazard_type,
-        area_name=area_name,
+        area_name=area_filter,
         date_from=date_from,
         date_to=date_to,
         sort=sort,
@@ -73,6 +75,7 @@ def admin_escalations_endpoint(
     user: Any = Depends(get_current_user),
     severity: SeverityLevel | None = Query(default=None),
     hazard_type: HazardType | None = Query(default=None),
+    area: str | None = Query(default=None, min_length=2, max_length=120),
     area_name: str | None = Query(default=None, min_length=2, max_length=120),
     date_from: str | None = Query(default=None),
     date_to: str | None = Query(default=None),
@@ -81,10 +84,11 @@ def admin_escalations_endpoint(
     min_upvotes: int = Query(default=5, ge=5, le=1000),
 ):
     require_admin(user)
+    area_filter = area_name or area
     escalations = list_escalations(
         severity=severity,
         hazard_type=hazard_type,
-        area_name=area_name,
+        area_name=area_filter,
         date_from=date_from,
         date_to=date_to,
         sort=sort,
@@ -126,6 +130,7 @@ def admin_export_reports(
     severity: SeverityLevel | None = Query(default=None),
     status: ReportStatus | None = Query(default=None),
     hazard_type: HazardType | None = Query(default=None),
+    area: str | None = Query(default=None, min_length=2, max_length=120),
     area_name: str | None = Query(default=None, min_length=2, max_length=120),
     date_from: str | None = Query(default=None),
     date_to: str | None = Query(default=None),
@@ -133,11 +138,12 @@ def admin_export_reports(
     limit: int = Query(default=2000, ge=1, le=5000),
 ):
     require_admin(user)
+    area_filter = area_name or area
     csv_text = export_reports_csv(
         severity=severity,
         status=status,
         hazard_type=hazard_type,
-        area_name=area_name,
+        area_name=area_filter,
         date_from=date_from,
         date_to=date_to,
         sort=sort,
@@ -152,6 +158,7 @@ def admin_dashboard_bundle(
     severity: SeverityLevel | None = Query(default=None),
     status: ReportStatus | None = Query(default=None),
     hazard_type: HazardType | None = Query(default=None),
+    area: str | None = Query(default=None, min_length=2, max_length=120),
     area_name: str | None = Query(default=None, min_length=2, max_length=120),
     date_from: str | None = Query(default=None),
     date_to: str | None = Query(default=None),
@@ -160,11 +167,12 @@ def admin_dashboard_bundle(
     include_escalations: bool = Query(default=False),
 ):
     require_admin(user)
+    area_filter = area_name or area
     return get_admin_dashboard_bundle(
         severity=severity,
         status=status,
         hazard_type=hazard_type,
-        area_name=area_name,
+        area_name=area_filter,
         date_from=date_from,
         date_to=date_to,
         sort=sort,

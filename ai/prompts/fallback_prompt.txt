@@ -1,0 +1,22 @@
+You are an environmental hazard classifier.
+
+Google Cloud Vision could not detect clear labels in this photo (all confidence scores below 0.70).
+
+Based only on the context - location: lat {lat}, lng {lng}, submitted via an environmental reporting app - make a best-guess classification.
+
+Return the same JSON schema as the main prompt, including a `resources` object, but set "confidence": "low" in the response.
+
+{{
+  "hazard_type": "...",
+  "severity": "...",
+  "department": "...",
+  "summary": "One sentence describing the hazard",
+  "complaint_letter": "Full formal letter text here",
+  "resources": {{
+    "workers": 2,
+    "vehicles": ["utility vehicle"],
+    "estimated_time": "2-4 hours",
+    "priority": "medium"
+  }},
+  "confidence": "low"
+}}

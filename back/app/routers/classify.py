@@ -1,15 +1,23 @@
 from datetime import datetime, timezone
+from pathlib import Path
+import sys
 from fastapi import APIRouter, Depends
 from typing import Any
 
 from app.core.auth import get_current_user
-from app.models.schemas import ClassifyRequest
-from app.services.ai import call_cloud_vision, call_gemini
+from app.models.schemas import ClassifyRequest, ClassificationResult
+from app.services.ai import call_cloud_vision, call_gemini, ensure_classification_result
+
+ROOT_DIR = Path(__file__).resolve().parents[3]
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
+from ai.pipeline import build_fallback_prompt, build_hazard_classification_prompt
 
 router = APIRouter(prefix="/api", tags=["classify"])
 
 
-@router.post("/classify")
+@router.post("/classify", response_model=ClassificationResult)
 async def classify_photo(
     payload: ClassifyRequest,
     _user: Any = Depends(get_current_user),
@@ -26,40 +34,21 @@ async def classify_photo(
     now_iso = datetime.now(timezone.utc).isoformat()
 
     if labels:
-        prompt = (
-            "You are an environmental hazard classification AI for a civic reporting platform.\n\n"
-            "I will give you a list of object labels detected in a photo by Google Cloud Vision.\n\n"
-            "Your task:\n"
-            "1. Classify the hazard into exactly one of: illegal_dumping, oil_spill, e_waste, "
-            "water_pollution, blocked_drain, air_pollution, other\n"
-            "2. Assign severity: high, medium, or low\n"
-            "3. Identify the responsible department: Municipal Sanitation, EPA, Public Works, "
-            "Parks Department, or Drainage Authority\n"
-            "4. Write a formal 3-paragraph complaint letter addressed to that department\n\n"
-            f"Labels detected: {labels}\n"
-            f"Location: lat {payload.lat}, lng {payload.lng}\n"
-            f"Date and time: {now_iso}\n"
-            f"Reporter name: {reporter_name}\n"
-            f"Photo URL: {payload.photo_url}\n\n"
-            "Respond ONLY with valid JSON. No markdown, no explanation, no preamble.\n\n"
-            "{\n"
-            '  "hazard_type": "...",\n'
-            '  "severity": "...",\n'
-            '  "department": "...",\n'
-            '  "summary": "One sentence describing the hazard",\n'
-            '  "complaint_letter": "Full formal letter text here"\n'
-            "}\n"
+        prompt = build_hazard_classification_prompt(
+            labels=labels,
+            lat=payload.lat,
+            lng=payload.lng,
+            current_datetime=now_iso,
+            reporter_name=reporter_name,
+            photo_url=payload.photo_url,
         )
     else:
-        prompt = (
-            "You are an environmental hazard classifier.\n\n"
-            "Google Cloud Vision could not detect clear labels in this photo "
-            "(all confidence scores below 0.70).\n\n"
-            "Based only on the context - location: lat "
-            f"{payload.lat}, lng {payload.lng}, submitted via an environmental reporting app - "
-            "make a best-guess classification.\n\n"
-            "Return the same JSON schema as above, but set \"confidence\": \"low\" in the response.\n"
+        prompt = build_fallback_prompt(
+            lat=payload.lat,
+            lng=payload.lng,
         )
 
     result = await call_gemini(prompt)
-    return {"labels": labels, "result": result}
+    if not labels and "confidence" not in result:
+        result["confidence"] = "low"
+    return ensure_classification_result(result)

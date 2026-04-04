@@ -185,11 +185,12 @@ def list_reports(
     status: str | None = None,
     hazard_type: str | None = None,
     area_name: str | None = None,
+    user_id: str | None = None,
     limit: int = 500,
 ) -> list[dict]:
     client = get_supabase_client()
     query = client.table("reports").select(
-        "id,lat,lng,hazard_type,severity,upvotes,status,created_at"
+        "id,user_id,lat,lng,hazard_type,severity,department,summary,upvotes,status,created_at,area,area_name,location,location_name,address"
     )
     if severity:
         query = query.eq("severity", severity)
@@ -197,6 +198,8 @@ def list_reports(
         query = query.eq("status", status)
     if hazard_type:
         query = query.eq("hazard_type", hazard_type)
+    if user_id:
+        query = query.eq("user_id", user_id)
 
     try:
         result = query.order("created_at", desc=True).limit(limit).execute()
