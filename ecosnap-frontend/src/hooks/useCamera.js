@@ -1,7 +1,14 @@
 import { useState, useCallback } from 'react'
 import { supabase } from '../lib/supabaseClient'
-import { SUPABASE_BUCKET } from '../utils/helpers'
 import toast from 'react-hot-toast'
+
+const BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+
+/** Get current Supabase session JWT */
+async function getToken() {
+  const { data } = await supabase.auth.getSession()
+  return data?.session?.access_token ?? null
+}
 
 export function useCamera() {
   const [photo,     setPhoto]     = useState(null) // { file, preview, url }
@@ -18,21 +25,43 @@ export function useCamera() {
     setPhoto(null)
   }, [photo])
 
-  const upload = useCallback(async (uid = 'anon') => {
+  /**
+   * Upload via the backend POST /api/upload — uses service key, bypasses RLS.
+   * Falls back to local preview URL if backend upload fails.
+   */
+  const upload = useCallback(async () => {
     if (!photo?.file) throw new Error('No photo')
     setUploading(true)
     try {
-      const ext  = photo.file.name.split('.').pop() || 'jpg'
-      const path = `${uid}/${Date.now()}.${ext}`
-      const { error } = await supabase.storage.from(SUPABASE_BUCKET).upload(path, photo.file)
-      if (error) throw error
-      const { data } = supabase.storage.from(SUPABASE_BUCKET).getPublicUrl(path)
-      setPhoto(p => ({ ...p, url: data.publicUrl }))
-      return data.publicUrl
+      const token = await getToken()
+      const fd = new FormData()
+      fd.append('file', photo.file)
+
+      const res = await fetch(`${BASE}/api/upload`, {
+        method: 'POST',
+        body: fd,
+        // Don't set Content-Type — browser sets it with the correct multipart boundary
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      })
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: 'Upload failed' }))
+        console.error('Backend upload error:', err)
+        toast('Using local photo (upload unavailable)', { icon: '⚠️' })
+        return photo.preview
+      }
+
+      const data = await res.json()
+      const publicUrl = data.public_url
+      setPhoto(p => ({ ...p, url: publicUrl }))
+      return publicUrl
     } catch (e) {
-      toast.error('Photo upload failed')
-      throw e
-    } finally { setUploading(false) }
+      console.error('Photo upload error:', e)
+      toast('Using local photo', { icon: '⚠️' })
+      return photo.preview
+    } finally {
+      setUploading(false)
+    }
   }, [photo])
 
   const cleanup = useCallback(() => {

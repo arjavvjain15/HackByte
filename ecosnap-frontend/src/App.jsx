@@ -9,6 +9,7 @@ import { ReportPage }    from './pages/ReportPage'
 import { MapPage }       from './pages/MapPage'
 import { NearbyPage }    from './pages/NearbyPage'
 import { BadgesPage }    from './pages/BadgesPage'
+import { MyReportsPage } from './pages/MyReportsPage'
 import { AdminPage }       from './pages/AdminPage'
 import { PageSpinner }     from './components/common/Spinner'
 /* ─── Preview (dev-only) ─── */
@@ -46,7 +47,7 @@ function AppRoutes() {
     <Routes>
       {/* Public */}
       <Route path="/"              element={<PublicRoute><LandingPage /></PublicRoute>} />
-      <Route path="/auth/callback" element={<Navigate to="/dashboard" replace />} />
+      <Route path="/auth/callback" element={<PublicRoute><LandingPage /></PublicRoute>} />
 
       {/* User */}
       <Route path="/dashboard"  element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
@@ -54,6 +55,7 @@ function AppRoutes() {
       <Route path="/map"        element={<ProtectedRoute><MapPage />       </ProtectedRoute>} />
       <Route path="/nearby"     element={<ProtectedRoute><NearbyPage />   </ProtectedRoute>} />
       <Route path="/badges"     element={<ProtectedRoute><BadgesPage />   </ProtectedRoute>} />
+      <Route path="/my-reports" element={<ProtectedRoute><MyReportsPage /></ProtectedRoute>} />
 
       {/* Admin */}
       <Route path="/admin" element={<AdminRoute><AdminPage /></AdminRoute>} />

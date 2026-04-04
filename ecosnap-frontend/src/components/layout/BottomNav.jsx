@@ -24,10 +24,10 @@ export function BottomNav() {
         <span className="tab-label">Map</span>
       </NavLink>
 
-      <NavLink to="/nearby" id="nav-nearby" className={({isActive}) => `tab-item${isActive?' active':''}`}>
+      <NavLink to="/my-reports" id="nav-my-reports" className={({isActive}) => `tab-item${isActive?' active':''}`}>
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4">
-          <circle cx="8" cy="8" r="7"/>
-          <path d="M8 5v3l2 2" strokeLinecap="round"/>
+          <path d="M3 2h10a1 1 0 011 1v10a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1z"/>
+          <path d="M5 6h6M5 9h4" strokeLinecap="round"/>
         </svg>
         <span className="tab-label">My reports</span>
       </NavLink>

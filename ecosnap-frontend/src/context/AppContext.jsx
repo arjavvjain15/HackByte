@@ -22,7 +22,7 @@ export function AppProvider({ children }) {
 
   const patchReportCount = useCallback((id, delta) => {
     const patch = list => list.map(r => r.id === id ? { ...r, upvotes: (r.upvotes||0) + delta } : r)
-    setReports(patch); setNearbyReports(patch)
+    setReports(patch); setNearbyReports(patch); setMyReports(patch)
   }, [])
 
   return (

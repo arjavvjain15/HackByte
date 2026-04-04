@@ -19,6 +19,7 @@ export function DashboardPage() {
   const nav = useNavigate()
   const didFetch = useRef(false)
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (didFetch.current) return
     didFetch.current = true
@@ -30,19 +31,28 @@ export function DashboardPage() {
   async function loadNotifs() {
     if (!user) return
     setLoadN(true)
-    try { const d = await getNotifications(user.id); setNotifications(Array.isArray(d) ? d : []) }
+    try {
+      const d = await getNotifications()
+      // /api/me/dashboard returns { activity, badges, my_reports, ... }
+      const activity = Array.isArray(d.activity) ? d.activity : []
+      setNotifications(activity)
+    }
     catch { setNotifications(DEMO_NOTIFICATIONS) }
     finally { setLoadN(false) }
   }
 
   async function loadBadges() {
     if (!user) return
-    try { const d = await getUserBadges(user.id); setBadges(Array.isArray(d.badges ?? d) ? (d.badges || d) : []) }
+    try {
+      const d = await getUserBadges()
+      // /api/me/badges returns { badges: [...] }
+      setBadges(Array.isArray(d.badges) ? d.badges : [])
+    }
     catch { setBadges([{ badge_id:'first_report' }, { badge_id:'five_reports' }, { badge_id:'community_voice' }]) }
   }
 
   const resolved   = myReports.filter(r => r.status === 'resolved').length
-  const earnedIds  = new Set(badges.map(b => b.badge_id))
+  const earnedIds  = new Set(badges.filter(b => b.earned === true).map(b => b.id || b.badge_id))
   const displayName = profile?.full_name || user?.user_metadata?.full_name || 'there'
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Good morning,' : hour < 17 ? 'Good afternoon,' : 'Good evening,'
@@ -66,7 +76,7 @@ export function DashboardPage() {
             <button
               id="signout-btn"
               onClick={signOut}
-              style={{ background:'none', border:'none', cursor:'pointer', fontSize:11, color:'var(--text3)', padding:'4px 8px',
+              style={{ background:'none', cursor:'pointer', fontSize:11, color:'var(--text3)', padding:'4px 8px',
                        border:'0.5px solid var(--border2)', borderRadius:'var(--r-sm)' }}
             >
               Sign out
@@ -98,7 +108,7 @@ export function DashboardPage() {
           <div style={{ marginTop:10 }}>
             <div className="sec-head">
               <span className="sec-title">Your reports</span>
-              <span className="sec-link" onClick={() => nav('/nearby')}>See all</span>
+              <span className="sec-link" onClick={() => nav('/my-reports')}>See all</span>
             </div>
 
             {/* Tab row */}

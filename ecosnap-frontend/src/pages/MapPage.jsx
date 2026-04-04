@@ -3,9 +3,12 @@ import { Layout } from '../components/layout/Layout'
 import { HazardMap } from '../components/map/HazardMap'
 import { Spinner } from '../components/common/Spinner'
 import { useReports } from '../hooks/useReports'
+import { useGeolocation } from '../hooks/useGeolocation'
 
 export function MapPage() {
   const { reports, loadAll, fetchAll } = useReports()
+  // Call for side-effect: sets userLoc in context → map centers + shows "You are here"
+  useGeolocation()
   const did = useRef(false)
 
   useEffect(() => {

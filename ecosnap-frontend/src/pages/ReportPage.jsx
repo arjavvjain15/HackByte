@@ -34,16 +34,22 @@ export function ReportPage() {
 
   const chosenLoc = loc || pinnedLoc
 
-  /* ── Step 0 → 1: take photo + classify ── */
+  /* ── Step 0 → 1: upload photo → get URL → classify ── */
   async function handlePhotoConfirm() {
     if (!photo) return
     setStep(1); setAiLoad(true)
     try {
+      // 1. Upload to Supabase Storage (or fall back to local preview URL)
       const photoUrl = await upload(user?.id)
-      const result   = await classifyHazard(photo.file)
+
+      // 2. Classify using the URL (backend expects JSON with photo_url, lat, lng)
+      const loc = chosenLoc || { lat: 0, lng: 0 }
+      const result = await classifyHazard(photoUrl, loc.lat, loc.lng)
       setAi({ ...result, photo_url: photoUrl })
-    } catch { setAi({ hazard_type:'unknown_hazard', severity:'medium', department:'Municipal Authority', photo_url: photo?.preview }) }
-    finally { setAiLoad(false); setStep(2) }
+    } catch {
+      // Graceful fallback — still let user submit with defaults
+      setAi({ hazard_type: 'unknown_hazard', severity: 'medium', department: 'Municipal Authority', photo_url: photo?.preview })
+    } finally { setAiLoad(false); setStep(2) }
   }
 
   /* ── Step 2 → 3 ── */

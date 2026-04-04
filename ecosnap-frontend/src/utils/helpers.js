@@ -53,11 +53,11 @@ export function haversine(lat1, lng1, lat2, lng2) {
 }
 
 export const BADGES = [
-  { id:'first_report',   emoji:'🌿', name:'First report',    desc:'Filed your first hazard report' },
-  { id:'five_reports',   emoji:'🔥', name:'5 reports',       desc:'Filed 5 hazard reports' },
-  { id:'community_voice',emoji:'📍', name:'Community voice', desc:'Received your first upvote' },
-  { id:'ten_resolved',   emoji:'🏆', name:'10 resolved',     desc:'Had 10 reports resolved' },
-  { id:'escalator',      emoji:'⚡', name:'Escalator',       desc:'Triggered an escalation' },
+  { id:'first_report',   emoji:'🌱', name:'First report',    desc:'Filed your first hazard report' },
+  { id:'three_reports',  emoji:'🔎', name:'3 reports',       desc:'Filed 3 hazard reports' },
+  { id:'five_reports',   emoji:'🌿', name:'5 reports',       desc:'Filed 5 hazard reports' },
+  { id:'first_resolved', emoji:'🏆', name:'First resolved',  desc:'Got your first report resolved' },
+  { id:'ten_upvotes',    emoji:'⭐', name:'10 upvotes',      desc:'Your reports received 10 upvotes' },
 ]
 
 export const SUPABASE_BUCKET = 'hazard-photos'

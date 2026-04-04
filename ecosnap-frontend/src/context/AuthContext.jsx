@@ -23,7 +23,8 @@ export function AuthProvider({ children }) {
 
   async function fetchProfile(uid) {
     try {
-      const { data } = await supabase.from('profiles').select('*').eq('id', uid).single()
+      // maybeSingle() returns null (not 406) when no profile row exists yet
+      const { data } = await supabase.from('profiles').select('*').eq('id', uid).maybeSingle()
       if (data) setProfile(data)
     } catch { /* ignore */ }
     finally { setLoading(false) }

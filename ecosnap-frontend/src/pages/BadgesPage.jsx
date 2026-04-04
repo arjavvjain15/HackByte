@@ -16,15 +16,21 @@ export function BadgesPage() {
   useEffect(() => {
     if (did.current || !user) return
     did.current = true
-    getUserBadges(user.id)
-      .then(d => setBadges(Array.isArray(d.badges ?? d) ? (d.badges || d) : []))
-      .catch(() => setBadges([{ badge_id:'first_report' }, { badge_id:'community_voice' }]))
-    getNotifications(user.id)
-      .then(d => setNotifications(Array.isArray(d) ? d : []))
+    // getUserBadges() → { badges: [...] }
+    getUserBadges()
+      .then(d => setBadges(Array.isArray(d.badges) ? d.badges : []))
+      .catch(() => setBadges([{ badge_id: 'first_report' }, { badge_id: 'community_voice' }]))
+    // getNotifications() → /api/me/dashboard → { activity: [...], badges: [...], ... }
+    getNotifications()
+      .then(d => setNotifications(Array.isArray(d.activity) ? d.activity : []))
       .catch(() => setNotifications(DEMO_NOTIFICATIONS))
   }, [user, setBadges, setNotifications])
 
-  const earnedIds = new Set(badges.map(b => b.badge_id))
+  // badges from /api/me/badges → [{ id, name, icon, earned: bool }]
+  // Build a Set of earned badge IDs using the 'id' field (not 'badge_id')
+  const earnedIds = new Set(
+    badges.filter(b => b.earned === true).map(b => b.id || b.badge_id)
+  )
   const earnedCount = BADGES.filter(b => earnedIds.has(b.id)).length
   const displayName = profile?.full_name || user?.user_metadata?.full_name || 'User'
   const email = user?.email || ''
@@ -130,7 +136,8 @@ export function BadgesPage() {
           <div style={{ marginTop:20, borderTop:'0.5px solid var(--border)', paddingTop:14 }}>
             {[
               { label:'🗺️  Community Map', to:'/map' },
-              { label:'📋  Nearby reports', to:'/nearby' },
+              { label:'📋  My reports',    to:'/my-reports' },
+              { label:'📡  Nearby hazards', to:'/nearby' },
               { label:'➕  File a new report', to:'/report' },
             ].map(({ label, to }) => (
               <div
