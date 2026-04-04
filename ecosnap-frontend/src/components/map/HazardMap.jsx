@@ -26,6 +26,14 @@ const pinIcon = L.divIcon({
 function MapSync({ center }) {
   const map = useMap()
   useEffect(() => { if (center) map.setView(center, map.getZoom(), { animate: true }) }, [center, map])
+  useEffect(() => {
+    const handleMaxZoom = (e) => {
+      const { lat, lng } = e.detail
+      if (lat && lng) map.setView({ lat, lng }, 18, { animate: true })
+    }
+    window.addEventListener('map-zoom-max', handleMaxZoom)
+    return () => window.removeEventListener('map-zoom-max', handleMaxZoom)
+  }, [map])
   return null
 }
 

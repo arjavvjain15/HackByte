@@ -67,3 +67,55 @@ export const getUserBadges = () => req('/api/me/badges')
 
 /** GET /api/me/dashboard — returns activity/notifications for the authenticated user */
 export const getNotifications = () => req('/api/me/dashboard')
+
+/** GET /api/reports/:id — single report details */
+export const getReport = (id) => req(`/api/reports/${id}`)
+
+/** GET /api/admin/reports/:id/resolution-plan — AI resource plan (admin only) */
+export const getResolutionPlan = (id) => req(`/api/admin/reports/${id}/resolution-plan`)
+
+/** POST /api/notify/escalation — trigger escalation email */
+export const notifyEscalation = (payload) =>
+  req('/api/notify/escalation', { method: 'POST', body: JSON.stringify(payload) })
+
+/** POST /api/notify/resolved — trigger resolution email to reporter */
+export const notifyResolved = (payload) =>
+  req('/api/notify/resolved', { method: 'POST', body: JSON.stringify(payload) })
+
+/** GET /api/reports — fetch all, then compute top-5 leaderboard client-side */
+export const getLeaderboard = async () => {
+  const reports = await req('/api/reports')
+  const list = Array.isArray(reports) ? reports : (reports?.reports || [])
+  const counts = {}
+  for (const r of list) {
+    if (!r.user_id) continue
+    const key = r.user_id
+    if (!counts[key]) counts[key] = { user_id: r.user_id, count: 0 }
+    counts[key].count++
+  }
+
+  const top5 = Object.values(counts)
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5)
+
+  // Fetch display names from profiles table map
+  const topIds = top5.map(u => u.user_id)
+  let profileMap = {}
+  if (topIds.length > 0) {
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, display_name')
+      .in('id', topIds)
+    if (profiles) {
+      profiles.forEach(p => {
+        profileMap[p.id] = p.display_name
+      })
+    }
+  }
+
+  return top5.map((u, i) => ({
+    ...u,
+    display_name: profileMap[u.user_id] || 'Anonymous',
+    rank: i + 1
+  }))
+}

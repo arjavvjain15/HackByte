@@ -11,6 +11,7 @@ import { NearbyPage }    from './pages/NearbyPage'
 import { BadgesPage }    from './pages/BadgesPage'
 import { MyReportsPage } from './pages/MyReportsPage'
 import { AdminPage }       from './pages/AdminPage'
+ import { ReportDetailPage } from './pages/ReportDetailPage'
 import { PageSpinner }     from './components/common/Spinner'
 /* ─── Preview (dev-only) ─── */
 import { PreviewPage }     from './pages/PreviewPage'
@@ -56,6 +57,7 @@ function AppRoutes() {
       <Route path="/nearby"     element={<ProtectedRoute><NearbyPage />   </ProtectedRoute>} />
       <Route path="/badges"     element={<ProtectedRoute><BadgesPage />   </ProtectedRoute>} />
       <Route path="/my-reports" element={<ProtectedRoute><MyReportsPage /></ProtectedRoute>} />
+      <Route path="/reports/:id"  element={<ProtectedRoute><ReportDetailPage /></ProtectedRoute>} />
 
       {/* Admin */}
       <Route path="/admin" element={<AdminRoute><AdminPage /></AdminRoute>} />
