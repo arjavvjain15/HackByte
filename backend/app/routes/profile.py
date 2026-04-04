@@ -49,7 +49,10 @@ def my_activity_endpoint(user: Any = Depends(get_current_user)):
 
 @router.get("/me/badges")
 def my_badges_endpoint(user: Any = Depends(get_current_user)):
-    """All badge definitions with earned=true/false for the current user."""
+    """All badge definitions with earned=true/false for the current user.
+    Also triggers badge evaluation so previously-earned badges are awarded retroactively."""
+    from app.services.badges import ensure_badges
     user_id = get_current_user_id(user)
+    ensure_badges(user_id)          # award any not-yet-granted badges
     badges = get_badges_state(user_id)
     return {"badges": badges}

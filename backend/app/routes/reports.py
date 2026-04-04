@@ -346,6 +346,46 @@ async def upvote_report(report_id: str, user: dict = Depends(get_current_user)):
     return {"report_id": report_id, "upvotes": new_upvotes, "status": new_status}
 
 
+# ── DELETE /api/reports/{id}/upvote ──────────────────────────────────────────
+
+@router.delete("/reports/{report_id}/upvote")
+async def remove_upvote(report_id: str, user: dict = Depends(get_current_user)):
+    """Remove a previously cast upvote. Decrements the report upvote count."""
+    user_id = get_current_user_id(user)
+
+    # Find the existing upvote row
+    try:
+        existing = supabase.table("upvotes").select("id").eq("report_id", report_id).eq("user_id", user_id).execute()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Lookup failed: {e}")
+
+    if not existing.data:
+        raise HTTPException(status_code=404, detail="You have not upvoted this report")
+
+    # Delete it
+    try:
+        supabase.table("upvotes").delete().eq("report_id", report_id).eq("user_id", user_id).execute()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Remove upvote failed: {e}")
+
+    # Decrement the counter on the report (floor at 0)
+    try:
+        report_res = supabase.table("reports").select("upvotes,status").eq("id", report_id).single().execute()
+        if isinstance(report_res.data, dict):
+            current = int(report_res.data.get("upvotes") or 0)
+            new_upvotes = max(0, current - 1)
+            current_status = report_res.data.get("status") or "open"
+            # Revert escalation if upvotes fall below threshold
+            new_status = "open" if current_status == "escalated" and new_upvotes < 5 else current_status
+            supabase.table("reports").update({"upvotes": new_upvotes, "status": new_status}).eq("id", report_id).execute()
+            return {"report_id": report_id, "upvotes": new_upvotes, "status": new_status}
+    except Exception as e:
+        logger.warning(f"Could not decrement upvote count: {e}")
+
+    return {"report_id": report_id, "removed": True}
+
+
+
 # ── GET /api/reports/{id}/upvote-status ───────────────────────────────────────
 
 @router.get("/reports/{report_id}/upvote-status")

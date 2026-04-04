@@ -6,7 +6,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.routes import classify, reports, admin, upvotes, upload, profile
+from app.routes import classify, reports, admin, upvotes, upload, profile, notify
 
 logging.basicConfig(
     level=logging.INFO,
@@ -43,3 +43,4 @@ app.include_router(upvotes.router,   prefix="/api")
 app.include_router(admin.router,     prefix="/api")
 app.include_router(upload.router,    prefix="/api")
 app.include_router(profile.router,   prefix="/api")
+app.include_router(notify.router,    prefix="/api")

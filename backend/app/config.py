@@ -9,11 +9,14 @@ import logging
 from pathlib import Path
 from typing import Any
 
-# Load .env from the project root (one level above backend/)
+# Load .env — check backend/backend/.env first, then backend/.env
 try:
     from dotenv import load_dotenv
-    _env_path = Path(__file__).resolve().parent.parent.parent / ".env"
-    load_dotenv(dotenv_path=_env_path, override=True)
+    _base = Path(__file__).resolve().parent.parent  # backend/backend/
+    for _candidate in [_base / ".env", _base.parent / ".env"]:
+        if _candidate.exists():
+            load_dotenv(dotenv_path=_candidate, override=True)
+            break
 except ImportError:
     pass  # dotenv not installed — rely on system env vars
 
