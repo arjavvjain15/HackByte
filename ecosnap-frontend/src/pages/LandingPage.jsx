@@ -24,12 +24,12 @@ export function LandingPage() {
   }
 
   return (
-    <div style={{ minHeight:'100vh', background:'#fff', display:'flex', flexDirection:'column' }}>
+    <div style={{ minHeight:'100vh', background:'linear-gradient(145deg, #f3faf6 0%, #e1f5e8 100%)', display:'flex', flexDirection:'column' }}>
       {/* Header */}
-      <div style={{ padding:'16px 20px', display:'flex', alignItems:'center', gap:8, borderBottom:'0.5px solid var(--border)' }}>
-        <div style={{ width:8, height:8, borderRadius:'50%', background:'var(--green)' }} />
-        <span style={{ fontWeight:600, fontSize:15, color:'var(--text)' }}>EcoSnap</span>
-        <span style={{ marginLeft:'auto', fontSize:10, background:'var(--green-light)', color:'var(--green-dark)', padding:'2px 7px', borderRadius:4, fontWeight:500 }}>Beta</span>
+      <div style={{ padding:'20px 24px', display:'flex', alignItems:'center', gap:10, borderBottom:'0.5px solid var(--border)' }}>
+        <div style={{ width:12, height:12, borderRadius:'50%', background:'var(--green)', boxShadow:'0 0 8px rgba(29,158,117,0.5)' }} />
+        <span style={{ fontWeight:800, fontSize:24, letterSpacing:'-0.5px', background:'linear-gradient(90deg, var(--green-dark), var(--green))', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent' }}>EcoSnap</span>
+        <span style={{ marginLeft:'auto', fontSize:11, background:'var(--green-light)', color:'var(--green-dark)', padding:'4px 10px', borderRadius:8, fontWeight:600 }}>Beta</span>
       </div>
 
       {/* Hero */}
@@ -39,9 +39,8 @@ export function LandingPage() {
             <svg width="10" height="10" viewBox="0 0 10 10"><circle cx="5" cy="5" r="4" fill="var(--green)"/></svg>
             AI-Powered Reporting
           </div>
-          <h1 style={{ fontSize:32, fontWeight:700, lineHeight:1.2, color:'var(--text)', marginBottom:12 }}>
-            Patch the<br />
-            <span style={{ color:'var(--green)' }}>Reality</span>
+          <h1 style={{ fontSize:24, fontWeight:600, lineHeight:1.3, color:'var(--text)', marginBottom:14, letterSpacing: '-0.3px' }}>
+            Patch the <span style={{ color:'var(--green)', fontWeight:700 }}>Reality</span>
           </h1>
           <p style={{ fontSize:13, color:'var(--text2)', lineHeight:1.6, maxWidth:280 }}>
             Take a photo of an environmental hazard. AI identifies it, drafts a formal complaint, and pins it on the community map — in under 30 seconds.
@@ -57,12 +56,13 @@ export function LandingPage() {
             { emoji:'📋', label:'Letter generated', desc:'Formal complaint drafted' },
           ].map(({ emoji, label, desc }) => (
             <div key={label} style={{
-              background:'var(--bg2)', borderRadius:'var(--r-md)',
-              padding:'10px 12px',
+              background:'var(--bg)', borderRadius:'var(--r-md)',
+              padding:'14px 12px', border:'1px solid var(--border2)',
+              boxShadow:'0 2px 8px rgba(0,0,0,0.02)'
             }}>
-              <div style={{ fontSize:20, marginBottom:4 }}>{emoji}</div>
-              <div style={{ fontSize:11, fontWeight:500, marginBottom:2 }}>{label}</div>
-              <div style={{ fontSize:10, color:'var(--text2)' }}>{desc}</div>
+              <div style={{ fontSize:22, marginBottom:6 }}>{emoji}</div>
+              <div style={{ fontSize:12, fontWeight:600, marginBottom:4, color:'var(--text)' }}>{label}</div>
+              <div style={{ fontSize:10.5, color:'var(--text2)', lineHeight:1.4 }}>{desc}</div>
             </div>
           ))}
         </div>

@@ -1,12 +1,12 @@
 import { useState, useCallback } from 'react'
 import { useAuth } from '../context/useAuth'
 import { useApp } from '../context/useApp'
-import { getAllReports, getMyReports, getNearbyReports } from '../services/api'
+import { getAllReports, getMyReports } from '../services/api'
 import { DEMO_REPORTS } from '../utils/helpers'
 
 export function useReports() {
   const { user } = useAuth()
-  const { reports, setReports, myReports, setMyReports, nearbyReports, setNearbyReports, userLoc } = useApp()
+  const { reports, setReports, myReports, setMyReports, nearbyReports, setNearbyReports } = useApp()
   const [loadAll,    setLoadAll]    = useState(false)
   const [loadMine,   setLoadMine]   = useState(false)
   const [loadNearby, setLoadNearby] = useState(false)
@@ -31,14 +31,13 @@ export function useReports() {
   }, [user, setMyReports])
 
   const fetchNearby = useCallback(async () => {
-    if (!userLoc) return
     setLoadNearby(true)
     try {
-      const d = await getNearbyReports(userLoc.lat, userLoc.lng)
+      const d = await getAllReports()
       setNearbyReports(Array.isArray(d) ? d : d?.reports || DEMO_REPORTS)
     } catch { setNearbyReports(DEMO_REPORTS) }
     finally { setLoadNearby(false) }
-  }, [userLoc, setNearbyReports])
+  }, [setNearbyReports])
 
   return { reports, myReports, nearbyReports, loadAll, loadMine, loadNearby, fetchAll, fetchMine, fetchNearby }
 }

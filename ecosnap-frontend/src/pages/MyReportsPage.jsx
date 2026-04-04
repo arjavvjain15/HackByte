@@ -62,7 +62,7 @@ export function MyReportsPage() {
 
           {/* Cards */}
           {!loadMine && myReports.map((r, i) => (
-            <div key={r.id} className="anim-fadeUp" style={{ animationDelay:`${i * 40}ms` }}>
+            <div key={r.id || i} className="anim-fadeUp" style={{ animationDelay:`${i * 40}ms` }}>
               <ReportCard report={r} showProgress={true} showUpvote={true} />
             </div>
           ))}

@@ -1,16 +1,17 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Layout } from '../components/layout/Layout'
 import { SkeletonBadge } from '../components/common/Skeletons'
 import { useAuth } from '../context/useAuth'
 import { useApp } from '../context/useApp'
-import { getUserBadges, getNotifications } from '../services/api'
+import { getUserBadges, getNotifications, getLeaderboard } from '../services/api'
 import { BADGES, DEMO_NOTIFICATIONS, fmtHazard, formatDate } from '../utils/helpers'
 
 export function BadgesPage() {
   const { user, profile, signOut } = useAuth()
   const { badges, setBadges, notifications, setNotifications } = useApp()
   const nav = useNavigate()
+  const [leaderboard, setLeaderboard] = useState([])
   const did = useRef(false)
 
   useEffect(() => {
@@ -24,6 +25,9 @@ export function BadgesPage() {
     getNotifications()
       .then(d => setNotifications(Array.isArray(d.activity) ? d.activity : []))
       .catch(() => setNotifications(DEMO_NOTIFICATIONS))
+    getLeaderboard()
+      .then(d => setLeaderboard(Array.isArray(d) ? d : []))
+      .catch(() => setLeaderboard([]))
   }, [user, setBadges, setNotifications])
 
   // badges from /api/me/badges → [{ id, name, icon, earned: bool }]
@@ -130,6 +134,33 @@ export function BadgesPage() {
                 </div>
               )
             })}
+          </div>
+
+          {/* ── Leaderboard ── */}
+          <div style={{ marginTop:16 }}>
+            <div className="sec-head">
+              <span className="sec-title">🏆 Leaderboard</span>
+              <span style={{ fontSize:9, color:'var(--text3)' }}>Top reporters</span>
+            </div>
+            {leaderboard.length === 0 ? (
+              <div style={{ textAlign:'center', padding:'12px 0', color:'var(--text3)', fontSize:12 }}>Loading…</div>
+            ) : leaderboard.map((u, i) => (
+              <div key={u.user_id} style={{
+                display:'flex', alignItems:'center', gap:10, padding:'8px 0',
+                borderBottom:'0.5px solid var(--border)'
+              }}>
+                <div style={{
+                  width:22, height:22, borderRadius:'50%', flexShrink:0,
+                  background: i===0?'#EF9F27': i===1?'#ADB5BD': i===2?'#CD7F32':'var(--bg2)',
+                  display:'flex', alignItems:'center', justifyContent:'center',
+                  fontSize:11, fontWeight:700, color: i<3?'#fff':'var(--text3)'
+                }}>{u.rank}</div>
+                <span style={{ flex:1, fontSize:12, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                  {u.display_name}
+                </span>
+                <span style={{ fontSize:11, fontWeight:600, color:'var(--green-dark)' }}>{u.count} reports</span>
+              </div>
+            ))}
           </div>
 
           {/* ── Quick links ── */}
