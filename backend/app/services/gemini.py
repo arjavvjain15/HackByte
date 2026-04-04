@@ -232,3 +232,38 @@ async def classify_with_gemini(
     except Exception as e:
         logger.error(f"Gemini API call failed on attempt 2: {e}")
         raise GeminiParseError(f"Gemini API unavailable: {str(e)}")
+
+
+async def predict_resolution_plan(hazard_type: str, severity: str, summary: str, complaint: str) -> dict:
+    """
+    On-demand AI prediction of resolution resources based on text context.
+    Does not use the image to save tokens and speed up the request.
+    """
+    prompt = f"""You are a municipal resource planning AI. Given an environmental hazard report, predict the resources needed to completely resolve it.
+
+Hazard Details:
+- Type: {hazard_type}
+- Severity: {severity}
+- Summary: {summary}
+- Official Complaint Details: {complaint}
+
+Determine the optimal resolution strategy and resource allocation.
+Respond with ONLY valid JSON matching this exact structure:
+{{
+  "resources": {{
+    "workers": <number>,
+    "vehicles": ["<string>", ...],
+    "estimated_time": "<string, e.g. '2 hours' or '3 days'>",
+    "priority": "<high | medium | low>"
+  }}
+}}"""
+
+    # We only need text generation here, no image needed.
+    try:
+        raw_text = _call_gemini(prompt)
+        return _extract_json(raw_text)
+    except GeminiParseError:
+        # Retry with strict formatting instructions
+        strict_prompt = prompt + "\n\nCRITICAL: Your response MUST be a single valid JSON object starting with { and ending with }. No markdown fences or other text."
+        raw_text = _call_gemini(strict_prompt)
+        return _extract_json(raw_text)

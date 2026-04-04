@@ -6,7 +6,16 @@ Works perfectly on Python 3.14 — zero dependency conflicts.
 import os
 import httpx
 import logging
+from pathlib import Path
 from typing import Any
+
+# Load .env from the project root (one level above backend/)
+try:
+    from dotenv import load_dotenv
+    _env_path = Path(__file__).resolve().parent.parent.parent / ".env"
+    load_dotenv(dotenv_path=_env_path, override=True)
+except ImportError:
+    pass  # dotenv not installed — rely on system env vars
 
 logger = logging.getLogger(__name__)
 
@@ -176,7 +185,9 @@ class QueryBuilder:
             raise ValueError(f"Unknown method: {self._method}")
 
         if resp.status_code >= 400:
-            logger.error(f"Supabase {self._method} {self._table}: {resp.status_code} {resp.text}")
+            error_msg = f"Supabase {self._method} {self._table}: {resp.status_code} {resp.text}"
+            logger.error(error_msg)
+            raise RuntimeError(error_msg)
 
         return _SupabaseResult(resp, is_single=self._is_single, count_mode=self._count_mode)
 
