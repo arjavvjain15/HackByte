@@ -127,7 +127,7 @@ def admin_bulk_update(
         raise HTTPException(status_code=400, detail="No report IDs provided")
 
     try:
-        reports_res = supabase.table("reports").select("id,user_id").in_("id", payload.ids).execute()
+        reports_res = supabase.table("reports").select("id,user_id,hazard_type").in_("id", payload.ids).execute()
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Fetch failed: {e}")
 
@@ -145,6 +145,31 @@ def admin_bulk_update(
         supabase.table("reports").update(update_data).in_("id", payload.ids).execute()
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Update failed: {e}")
+
+    # ===== Native Resolution Emails =====
+    if payload.status == "resolved":
+        import httpx, os
+        try:
+            from app.routes.notify import send_resolved_email, ResolvedPayload
+            user_emails = {}
+            # Get user emails from auth.users natively
+            url = os.environ.get("SUPABASE_URL")
+            key = os.environ.get("SUPABASE_SERVICE_KEY")
+            if url and key:
+                auth_res = httpx.get(f"{url}/auth/v1/admin/users", headers={"apikey": key, "Authorization": f"Bearer {key}"})
+                if auth_res.status_code < 300:
+                    user_emails = {u.get("id"): u.get("email") for u in auth_res.json().get("users", [])}
+            
+            for r in reports:
+                u_email = user_emails.get(r.get("user_id"))
+                if u_email:
+                    send_resolved_email(ResolvedPayload(
+                        report_id=r.get("id"),
+                        user_email=u_email,
+                        hazard_type=r.get("hazard_type", "unknown")
+                    ))
+        except Exception as e:
+            logger.error(f"Failed to auto-send resolved emails: {e}")
 
     updated_profiles = 0
     if payload.status == "resolved":

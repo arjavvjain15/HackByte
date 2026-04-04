@@ -105,3 +105,66 @@ async def notify_escalation(
         "report_id": payload.report_id,
         "message": "Escalation processed"
     }
+
+
+# ==================== RESOLVED NOTIFICATION ====================
+
+class ResolvedPayload(BaseModel):
+    report_id: str
+    user_email: str
+    hazard_type: str = "unknown"
+
+
+def send_resolved_email(payload: ResolvedPayload) -> bool:
+    """Send a resolution confirmation email to the report creator."""
+    try:
+        msg = MIMEMultipart()
+        msg['From'] = EMAIL_CONFIG["sender"]
+        msg['To'] = payload.user_email
+        msg['Subject'] = "✅ Your EcoSnap report has been resolved!"
+
+        body = f"""
+        Great news! Your EcoSnap hazard report has been resolved.
+
+        Report ID: {payload.report_id}
+        Hazard: {payload.hazard_type.replace('_', ' ').title()}
+        Status: RESOLVED
+        Time: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}
+
+        Thank you for making your community safer!
+        — EcoSnap Team
+        """
+
+        msg.attach(MIMEText(body, 'plain'))
+
+        server = smtplib.SMTP(EMAIL_CONFIG["smtp_server"], EMAIL_CONFIG["smtp_port"])
+        server.starttls()
+        server.login(EMAIL_CONFIG["sender"], EMAIL_CONFIG["password"])
+        server.send_message(msg)
+        server.quit()
+
+        logger.info(f"✅ Resolution email sent to {payload.user_email}")
+        return True
+
+    except Exception as e:
+        logger.error(f"❌ Resolution email failed: {e}")
+        return False
+
+
+@router.post("/resolved")
+async def notify_resolved(
+    payload: ResolvedPayload,
+    user: dict = Depends(get_current_user),
+):
+    """Admin-only: email the reporter when their report is resolved."""
+    require_admin(user)
+
+    logger.info(f"[Resolved] report={payload.report_id} | email={payload.user_email}")
+    success = send_resolved_email(payload)
+
+    return {
+        "success": success,
+        "email_sent": success,
+        "report_id": payload.report_id,
+        "message": "Resolution notification processed"
+    }

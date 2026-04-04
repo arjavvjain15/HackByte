@@ -182,6 +182,17 @@ async def get_reports(
             norm = area_name.strip().lower()
             data = [r for r in data if norm in str(r.get("summary") or "").lower()]
 
+        # Attach reporter profiles (bypasses RLS). Protect against dummy/test-1 UUIDs causing PG syntax errors.
+        uids = list({r.get("user_id") for r in data if r.get("user_id") and len(str(r.get("user_id"))) == 36})
+        if uids:
+            try:
+                profiles_res = supabase.table("profiles").select("id,display_name").in_("id", uids).execute()
+                p_map = {p["id"]: p.get("display_name") for p in (profiles_res.data or [])}
+                for r in data:
+                    r["display_name"] = p_map.get(r["user_id"])
+            except Exception as e:
+                logger.warning(f"Failed to stitch profiles: {e}")
+
         return {"reports": data}
     except Exception as e:
         logger.error(f"Failed to fetch reports: {e}")
@@ -300,7 +311,7 @@ async def upvote_report(report_id: str, user: dict = Depends(get_current_user)):
     user_id = get_current_user_id(user)
 
     try:
-        report_res = supabase.table("reports").select("id,user_id,upvotes,status").eq("id", report_id).single().execute()
+        report_res = supabase.table("reports").select("id,user_id,upvotes,status,hazard_type,severity,lat,lng,department").eq("id", report_id).single().execute()
     except Exception as e:
         raise HTTPException(status_code=404, detail=f"Report not found: {e}")
 
@@ -336,6 +347,21 @@ async def upvote_report(report_id: str, user: dict = Depends(get_current_user)):
         supabase.table("reports").update({"upvotes": new_upvotes, "status": new_status}).eq("id", report_id).execute()
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Report update failed: {e}")
+
+    # Auto-escalation email trigger natively
+    if new_status == "escalated" and current_status != "escalated":
+        try:
+            from app.routes.notify import send_email_alert, EscalationPayload
+            payload = EscalationPayload(
+                report_id=report_id,
+                hazard_type=report_res.data.get("hazard_type", "unknown"),
+                severity=report_res.data.get("severity", "unknown"),
+                location=f"{report_res.data.get('lat')}, {report_res.data.get('lng')}" if report_res.data.get('lat') else report_res.data.get("department", "unknown")
+            )
+            send_email_alert(payload)
+        except Exception as e:
+            import logging
+            logging.error(f"Auto-escalation email failed: {e}")
 
     if report_owner:
         try:
