@@ -1,6 +1,6 @@
 import { supabase } from '../lib/supabaseClient'
 
-const BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+const BASE = import.meta.env.VITE_API_URL 
 
 /** Get the current Supabase session JWT (or null if not logged in) */
 async function getToken() {

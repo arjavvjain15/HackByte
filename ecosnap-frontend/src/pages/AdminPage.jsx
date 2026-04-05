@@ -7,7 +7,7 @@ import { useGeolocation } from '../hooks/useGeolocation'
 import { fmtHazard, formatDate, DEMO_REPORTS } from '../utils/helpers'
 import toast from 'react-hot-toast'
 
-const BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+const BASE = import.meta.env.VITE_API_URL 
 const BCOLORS = ['#E24B4A','#378ADD','#EF9F27','#5DCAA5','#D85A30']
 const DEPTS = [
   { color:'#E24B4A', name:'Municipal Sanitation' },
