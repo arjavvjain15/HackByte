@@ -1,16 +1,22 @@
-import { fmtHazard, formatDate, statusProgress, statusBarClass, statusLabel } from '../../utils/helpers'
-import { SevBadge, StBadge, StatusDot } from '../common/Badges'
+import { useNavigate } from 'react-router-dom'
+import { fmtHazard, formatDate, statusProgress, statusBarClass } from '../../utils/helpers'
+import { SevBadge, StBadge } from '../common/Badges'
 import { useUpvote } from '../../hooks/useUpvote'
 
 export function ReportCard({ report, showProgress = true, showUpvote = true, compact = false }) {
   const { vote, upvoted } = useUpvote()
-  const isVoted   = upvoted.has(report.id)
-  const progress  = statusProgress(report.status)
-  const barClass  = statusBarClass(report.status)
+  const nav = useNavigate()
+  const isVoted    = upvoted.has(report.id)
+  const progress   = statusProgress(report.status)
+  const barClass   = statusBarClass(report.status)
   const isResolved = report.status === 'resolved'
 
   return (
-    <div className={`rc${isResolved ? ' rc-resolved' : ''}`}>
+    <div
+      className={`rc${isResolved ? ' rc-resolved' : ''}`}
+      onClick={() => nav(`/reports/${report.id}`)}
+      style={{ cursor:'pointer' }}
+    >
       {/* Top row: severity + ID */}
       <div style={{ display:'flex', alignItems:'center', gap:5, marginBottom:3 }}>
         <SevBadge severity={report.severity} />
@@ -20,7 +26,7 @@ export function ReportCard({ report, showProgress = true, showUpvote = true, com
       </div>
 
       {/* Hazard type */}
-      <div style={{ fontSize:11, fontWeight:500, marginBottom:compact?2:3 }}>
+      <div style={{ fontSize:11, fontWeight:500, marginBottom:compact ? 2 : 3 }}>
         {fmtHazard(report.hazard_type)}
       </div>
 
@@ -31,7 +37,7 @@ export function ReportCard({ report, showProgress = true, showUpvote = true, com
         </div>
       )}
 
-      {/* Footer: upvotes + status */}
+      {/* Footer: upvotes + status + upvote button */}
       <div style={{ display:'flex', alignItems:'center', gap:5 }}>
         <span style={{ fontSize:9, color:'var(--text3)' }}>{report.upvotes || 0} upvotes</span>
         <StBadge status={report.status} />
@@ -50,7 +56,7 @@ export function ReportCard({ report, showProgress = true, showUpvote = true, com
       {/* Progress bar */}
       {showProgress && (
         <div className="pbar">
-          <div className={`pbar-fill ${barClass}`} style={{ width: `${progress}%` }} />
+          <div className={`pbar-fill ${barClass}`} style={{ width:`${progress}%` }} />
         </div>
       )}
     </div>

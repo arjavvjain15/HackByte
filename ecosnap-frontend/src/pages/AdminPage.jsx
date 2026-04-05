@@ -1,8 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { HazardMap } from '../components/map/HazardMap'
 import { SevBadge, StBadge, StatusDot } from '../components/common/Badges'
 import { Spinner } from '../components/common/Spinner'
 import { useAuth } from '../context/useAuth'
+import { useApp } from '../context/useApp'
+import { getResolutionPlan } from '../services/api'
 import { useGeolocation } from '../hooks/useGeolocation'
 import { fmtHazard, formatDate, DEMO_REPORTS } from '../utils/helpers'
 import toast from 'react-hot-toast'
@@ -36,6 +39,8 @@ async function adminReq(path, opts = {}) {
 
 export function AdminPage() {
   const { signOut } = useAuth()
+  const { setMapCenter } = useApp()
+  const nav = useNavigate()
   useGeolocation() // side-effect: sets userLoc in context → map shows "You are here"
 
   const [reports,    setReports]    = useState([])
@@ -48,6 +53,8 @@ export function AdminPage() {
   const [rightTab,   setRightTab]   = useState('Reports')
   const [sortBy,     setSortBy]     = useState('newest')
   const [filter,     setFilter]     = useState('all')
+  const [plans, setPlans] = useState({})
+  const [loadingPlans, setLoadingPlans] = useState({})
   const did = useRef(false)
 
   const fetchAll = useCallback(async () => {
@@ -104,7 +111,7 @@ export function AdminPage() {
 
       toast.success(`Marked as ${newStatus.replace('_', ' ')}`)
 
-      // Task 2: trigger escalation email notification when status becomes escalated
+      // Task 2 (original): trigger escalation email when status becomes escalated
       if (newStatus === 'escalated') {
         try {
           await adminReq('/api/notify/escalation', {
@@ -120,13 +127,44 @@ export function AdminPage() {
           })
           toast('📧 Escalation email sent', { icon:'⚡' })
         } catch (emailErr) {
-          // Non-fatal — log but don't block the flow
           console.warn('[Admin] escalation notify failed:', emailErr.message)
+        }
+      }
+
+      // Task 5: email report creator when admin marks resolved
+      if (newStatus === 'resolved' && selected.user_email) {
+        try {
+          await adminReq('/api/notify/resolved', {
+            method: 'POST',
+            body: JSON.stringify({
+              report_id:   selected.id,
+              user_email:  selected.user_email,
+              hazard_type: selected.hazard_type,
+            }),
+          })
+          toast('📧 Creator notified of resolution', { icon:'✅' })
+        } catch (emailErr) {
+          console.warn('[Admin] resolution notify failed:', emailErr.message)
         }
       }
     } catch (e) {
       toast.error('Action failed: ' + e.message)
     } finally { setActionBusy(false) }
+  }
+
+  async function fetchPlan(id, e) {
+    if (e) e.stopPropagation()
+    if (plans[id] || loadingPlans[id]) return
+
+    setLoadingPlans(prev => ({ ...prev, [id]: true }))
+    try {
+      const d = await getResolutionPlan(id)
+      setPlans(prev => ({ ...prev, [id]: d.resolution_plan?.resources || d.resolution_plan || d }))
+    } catch (err) {
+      toast.error('Could not load plan: ' + err.message)
+    } finally {
+      setLoadingPlans(prev => ({ ...prev, [id]: false }))
+    }
   }
 
   const getNavList = () => {
@@ -395,12 +433,22 @@ export function AdminPage() {
 
             {/* Report cards */}
             <div style={{ flex:1, overflowY:'auto', padding:'0 8px 8px' }}>
-              {displayList.map(r => (
+              {displayList.map((r, i) => (
                 <div
-                  key={r.id}
+                  key={r.id || i}
                   id={`admin-rc-${r.id}`}
                   className={`rc${selected?.id === r.id ? ' rc-selected' : ''}`}
-                  onClick={() => setSelected(selected?.id === r.id ? null : r)}
+                  onClick={() => {
+                    const isSelect = selected?.id !== r.id
+                    setSelected(isSelect ? r : null)
+                    if (isSelect && r.lat && r.lng && setMapCenter) {
+                      setMapCenter({ lat: r.lat, lng: r.lng })
+                      // Hacky but reliable way to force max zoom internally natively via Leaflet since we don't hold the map ref here directly
+                      setTimeout(() => {
+                        window.dispatchEvent(new CustomEvent('map-zoom-max', { detail: { lat: r.lat, lng: r.lng } }))
+                      }, 50)
+                    }
+                  }}
                   style={{ cursor:'pointer' }}
                 >
                   <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:4 }}>
@@ -416,8 +464,54 @@ export function AdminPage() {
                     {(r.upvotes||0) >= 5 && r.status !== 'resolved' && (
                       <span style={{ fontSize:10, color:'var(--red-dark)' }}>⚡ Escalated</span>
                     )}
-                    <div style={{ marginLeft:'auto' }}><StatusDot status={r.status} /></div>
+                    <div style={{ marginLeft:'auto', display:'flex', alignItems:'center', gap:6 }}>
+                      <StatusDot status={r.status} />
+                      <span
+                        onClick={(e) => { e.stopPropagation(); nav(`/reports/${r.id}`) }}
+                        style={{ fontSize:9, color:'var(--green-dark)', cursor:'pointer', textDecoration:'underline' }}
+                      >View →</span>
+                    </div>
                   </div>
+
+                  {/* Get Plan Button (Inline) */}
+                  <div style={{ marginTop:10 }} onClick={e => e.stopPropagation()}>
+                    {!plans[r.id] && (
+                      <button
+                        onClick={(e) => fetchPlan(r.id, e)}
+                        disabled={loadingPlans[r.id]}
+                        style={{
+                          width:'100%', padding:'8px', border:'0.5px solid var(--border2)',
+                          borderRadius:'var(--r-md)', fontSize:11, fontWeight:500, cursor:'pointer',
+                          background:'var(--bg2)', color:'var(--text)', display:'flex',
+                          alignItems:'center', justifyContent:'center', gap:6,
+                          opacity: loadingPlans[r.id] ? 0.65 : 1
+                        }}
+                      >
+                        {loadingPlans[r.id] ? <Spinner size={12} /> : '🛠️'}
+                        {loadingPlans[r.id] ? 'Generating plan...' : 'Get Plan'}
+                      </button>
+                    )}
+
+                    {/* Show Plan Result */}
+                    {plans[r.id] && (
+                      <div style={{ marginTop:8, padding:'10px', background:'var(--bg2)', border:'0.5px solid var(--border)', borderRadius:'var(--r-sm)' }}>
+                        <div style={{ fontSize:11, fontWeight:600, marginBottom:8 }}>🛠️ Resolution Plan</div>
+                        {[
+                          { icon:'👷', l:'Workers',        v: plans[r.id].workers },
+                          { icon:'🚛', l:'Vehicles',       v: plans[r.id].vehicles?.join(', ') || plans[r.id].vehicles },
+                          { icon:'⏱️', l:'Estimated Time', v: plans[r.id].estimated_time },
+                          { icon:'⚡', l:'Priority',       v: <span style={{ color: plans[r.id].priority === 'high' ? 'var(--red-dark)' : plans[r.id].priority === 'medium' ? 'var(--orange-dark)' : 'var(--green-dark)' }}>{plans[r.id].priority?.toUpperCase()}</span> },
+                        ].map(({ icon, l, v }) => v != null && (
+                          <div key={l} style={{ display:'flex', alignItems:'center', padding:'4px 0', borderBottom:'0.5px solid var(--border)', fontSize:10 }}>
+                            <span style={{ marginRight:6 }}>{icon}</span>
+                            <span style={{ color:'var(--text2)', flex:1 }}>{l}:</span>
+                            <span style={{ fontWeight:500 }}>{v}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
                 </div>
               ))}
               {!loading && displayList.length === 0 && (
